@@ -1,6 +1,7 @@
 import {
   ExtendedHomeAssistant,
   VacuumCardConfig,
+  VacuumCardSelect,
   VacuumCardStat,
   ValetudoConfig,
 } from './types';
@@ -151,6 +152,12 @@ export function getValetudoSelects(
   return [valetudo?.mode, valetudo?.water].filter((id): id is string => !!id);
 }
 
+export function normalizeSelect(
+  item: string | VacuumCardSelect,
+): VacuumCardSelect {
+  return typeof item === 'string' ? { entity: item } : item;
+}
+
 export function getValetudoRooms(
   hass: ExtendedHomeAssistant,
   valetudo: ValetudoEntities,
@@ -207,9 +214,9 @@ export function getValetudoStats(
       hass.states[entity_id].attributes.unit_of_measurement === 'min';
     return {
       entity_id,
-      value_template: isMinutes
-        ? '{{ (value | float(0) / 60) | round(1) }}'
-        : undefined,
+      ...(isMinutes && {
+        value_template: '{{ (value | float(0) / 60) | round(1) }}',
+      }),
       unit: isMinutes ? 'h' : '%',
       subtitle: stripDeviceName(hass, entity_id, valetudo.deviceName),
     };
@@ -241,4 +248,33 @@ export function getValetudoStats(
     stats.cleaning = cleaningStats;
   }
   return stats;
+}
+
+export function getValetudoDefaults(
+  hass: ExtendedHomeAssistant,
+  valetudo: ValetudoEntities | null,
+  labels: { cleaningTime: string; cleanedArea: string },
+): Partial<Pick<VacuumCardConfig, 'battery_entity' | 'selects' | 'stats'>> {
+  if (!valetudo) {
+    return {};
+  }
+
+  const defaults: Partial<
+    Pick<VacuumCardConfig, 'battery_entity' | 'selects' | 'stats'>
+  > = {};
+  if (
+    valetudo.battery &&
+    hass.states[valetudo.vacuum]?.attributes.battery_level == null
+  ) {
+    defaults.battery_entity = valetudo.battery;
+  }
+  const selects = getValetudoSelects(valetudo);
+  if (selects.length) {
+    defaults.selects = selects;
+  }
+  const stats = getValetudoStats(hass, valetudo, labels);
+  if (Object.keys(stats).length) {
+    defaults.stats = stats;
+  }
+  return defaults;
 }

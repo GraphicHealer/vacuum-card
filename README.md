@@ -55,10 +55,12 @@ This card can be configured using Lovelace UI editor.
 3. Click Plus button to add a new card.
 4. Find _Custom: Vacuum Card_ in the list.
 5. Choose `entity`.
-6. Optionally pick a battery sensor, map camera and any `select` entities (e.g. cleaning mode or water level) to show next to fan speed.
+6. Optionally pick a battery sensor and map camera, add **Header Dropdowns** (`select` entities such as cleaning mode or water level, shown next to fan speed) and **Sensors** (stats), each with its own name, icon and options.
 7. Now you should see the preview of the card!
 
-_Sorry, no support for `actions`, `shortcuts` and `stats` in visual config yet._
+For a Valetudo vacuum, the editor writes everything it detects (battery sensor, header dropdowns and sensors) into the card config, so you can edit or remove any of it in the editor or in YAML.
+
+_Sorry, no support for `actions` and `shortcuts` in visual config yet._
 
 Typical example of using this card in YAML config would look like this:
 
@@ -117,7 +119,7 @@ Here is what every option means:
 | `type`           |       `string`       | **Required** | `custom:vacuum-card`                                                                                      |
 | `entity`         |       `string`       | **Required** | An entity_id within the `vacuum` domain.                                                                  |
 | `battery_entity` |       `string`       | Optional     | An entity_id within the `sensor` domain to display battery state and icon.                                |
-| `selects`        |       `array`        | Optional     | `select` / `input_select` entity_ids shown as dropdowns next to fan speed (e.g. cleaning mode, water).    |
+| `selects`        |       `array`        | Optional     | [Header dropdowns](#header-dropdowns-selects) next to fan speed (e.g. cleaning mode, water).              |
 | `map`            |       `string`       | Optional     | An entity_id within the `camera` or `image` domain, for streaming live vacuum map.                        |
 | `map_refresh`    |      `integer`       | `5`          | Update interval for map camera in seconds                                                                 |
 | `image`          |       `string`       | `default`    | Path to image of your vacuum cleaner. Better to have `png` or `svg`.                                      |
@@ -130,15 +132,28 @@ Here is what every option means:
 | `shortcuts`      |       `array`        | Optional     | List of shortcuts shown at the right bottom part of the card with custom actions for your vacuum cleaner. |
 | `valetudo`       | `boolean` / `object` | `true`       | Valetudo auto-detection. Set `false` to disable, or an object with `topic_prefix`, `identifier`.          |
 
-### Select entities
+### Header dropdowns (`selects`)
 
-Each entity in `selects` is rendered as a dropdown in the header, next to fan speed. Use it for things like cleaning mode (vacuum / mop / vacuum and mop), water level or mop intensity. Options are read live from the entity's `options` attribute and the icon comes from the entity itself, so any integration's options work. Picking an option calls `select.select_option` (or `input_select.select_option`).
+Each item in `selects` is rendered as a dropdown in the header, next to fan speed. Use it for things like cleaning mode (vacuum / mop / vacuum and mop), water level or mop intensity. Options are read live from the entity's `options` attribute and the icon comes from the entity itself, so any integration's options work. Picking an option calls `select.select_option` (or `input_select.select_option`).
+
+An item is either an entity_id or an object:
+
+| Name      |   Type   | Default      | Description                                                   |
+| --------- | :------: | ------------ | ------------------------------------------------------------- |
+| `entity`  | `string` | **Required** | A `select` / `input_select` entity_id.                        |
+| `name`    | `string` | Entity name  | Tooltip and accessible label of the dropdown.                 |
+| `icon`    | `string` | Entity icon  | Icon shown on the dropdown button.                            |
+| `options` | `array`  | All options  | Only show these options (values from the entity's `options`). |
 
 ```yaml
 type: custom:vacuum-card
 entity: vacuum.robot
 selects:
-  - select.robot_mode
+  - entity: select.robot_mode
+    icon: mdi:robot-vacuum
+    options:
+      - vacuum
+      - vacuum_and_mop
   - select.robot_water
 ```
 
@@ -167,7 +182,7 @@ The card then uses these entities from the same device, if the robot has them:
 | `sensor.*_current_statistics_time` / `..._area` | Stats while cleaning (minutes, m²)                                    | `stats`          |
 | `sensor.*_map_segments`                         | Rooms for the [room shortcuts](#room-shortcuts) button in the editor  | —                |
 
-Anything you configure explicitly takes precedence. The visual editor pre-fills the detected selects, so you can remove the ones you don't want.
+Anything you configure explicitly takes precedence. The visual editor writes the detected `battery_entity`, `selects` and `stats` into the card config, so you can change icons, names and options or remove items. Use `selects: []` or `stats: {}` to show none; if a key is left out entirely, the card falls back to auto-detection.
 
 Change `valetudo` settings only if the defaults don't fit:
 
@@ -205,7 +220,7 @@ shortcuts:
 
 ### `stats` object
 
-You can use any attribute of vacuum or even any entity by `entity_id` to display by stats section. You can also combine `attribute` with `entity_id` to extract an attribute value of specific entity:
+You can use any attribute of vacuum or even any entity by `entity_id` to display by stats section. You can also combine `attribute` with `entity_id` to extract an attribute value of specific entity. Stats are grouped by vacuum state (e.g. `cleaning`); `default` is used for any state without its own list. In the visual editor these are the **Sensors** lists.
 
 | Name             |   Type   | Default  | Description                                                                                          |
 | ---------------- | :------: | -------- | ---------------------------------------------------------------------------------------------------- |
@@ -214,6 +229,7 @@ You can use any attribute of vacuum or even any entity by `entity_id` to display
 | `value_template` | `string` | Optional | Jinja2 template returning a value. `value` variable represents the `entity_id` or `attribute` state. |
 | `unit`           | `string` | Optional | Unit of measure, i.e. `hours`.                                                                       |
 | `subtitle`       | `string` | Optional | Friendly name of the stat, i.e. `Filter`.                                                            |
+| `icon`           | `string` | Optional | Icon shown above the value, i.e. `mdi:air-filter`.                                                   |
 
 ### `actions` object
 

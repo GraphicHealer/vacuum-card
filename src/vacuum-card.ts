@@ -17,6 +17,7 @@ import {
   Template,
   VacuumCardAction,
   VacuumCardConfig,
+  VacuumCardSelect,
   VacuumCardStat,
   VacuumEntity,
   HassEntity,
@@ -32,6 +33,7 @@ import {
   findValetudoEntities,
   getValetudoSelects,
   getValetudoStats,
+  normalizeSelect,
 } from './valetudo';
 import DEFAULT_IMAGE from './vacuum.svg';
 
@@ -136,13 +138,15 @@ export class VacuumCard extends LitElement {
     return (this.hass.states[batteryEntityId] as VacuumBatteryEntity) ?? null;
   }
 
-  get selectEntityIds(): string[] {
-    return this.config.selects ?? getValetudoSelects(this.valetudo);
+  get selectItems(): VacuumCardSelect[] {
+    return (this.config.selects ?? getValetudoSelects(this.valetudo)).map(
+      normalizeSelect,
+    );
   }
 
   get stats(): Record<string, VacuumCardStat[]> {
-    if (Object.keys(this.config.stats).length || !this.valetudo) {
-      return this.config.stats;
+    if (this.config.stats || !this.valetudo) {
+      return this.config.stats ?? {};
     }
 
     return getValetudoStats(this.hass, this.valetudo, {
@@ -175,7 +179,7 @@ export class VacuumCard extends LitElement {
       this.config.entity,
       this.config.map,
       this.batteryEntity?.entity_id,
-      ...this.selectEntityIds,
+      ...this.selectItems.map(({ entity }) => entity),
       ...statEntities,
       valetudo?.error,
       valetudo?.statusFlag,
@@ -346,6 +350,7 @@ export class VacuumCard extends LitElement {
             class="dropdown-trigger"
             slot="trigger"
             aria-label=${ariaLabel ?? selectedLabel}
+            title=${ariaLabel ?? selectedLabel}
           >
             ${renderIcon ? renderIcon() : html`<ha-icon icon=${icon}></ha-icon>`}
             <span class="tip-title">${selectedLabel}</span>
@@ -387,15 +392,23 @@ export class VacuumCard extends LitElement {
     );
   }
 
-  private renderSelect(entityId: string): Template {
+  private renderSelect({
+    entity: entityId,
+    name,
+    icon,
+    options: shown,
+  }: VacuumCardSelect): Template {
     const stateObj = this.hass.states[entityId] as SelectEntity | undefined;
-    const options = stateObj?.attributes.options;
+    const options = stateObj?.attributes.options?.filter(
+      (option) => !shown?.length || shown.includes(option),
+    );
 
     if (!stateObj || !Array.isArray(options) || options.length === 0) {
       return nothing;
     }
 
-    const fallbackIcon = stateObj.attributes.icon ?? 'mdi:format-list-bulleted';
+    const fallbackIcon =
+      icon ?? stateObj.attributes.icon ?? 'mdi:format-list-bulleted';
 
     return this.renderDropdown({
       icon: fallbackIcon,
@@ -403,9 +416,9 @@ export class VacuumCard extends LitElement {
       options,
       onSelect: (e) => this.handleSelectOption(entityId, e.detail.item?.value),
       formatLabel: (value: string) => this.formatSelectOption(stateObj, value),
-      ariaLabel: String(stateObj.attributes.friendly_name ?? entityId),
+      ariaLabel: name ?? String(stateObj.attributes.friendly_name ?? entityId),
       renderIcon: (value?: string) =>
-        customElements.get('ha-state-icon')
+        customElements.get('ha-state-icon') && !(icon && value === undefined)
           ? html`<ha-state-icon
               .stateObj=${stateObj}
               .stateValue=${value ?? stateObj.state}
@@ -415,7 +428,7 @@ export class VacuumCard extends LitElement {
   }
 
   private renderSelects(): Template {
-    return html`${this.selectEntityIds.map((id) => this.renderSelect(id))}`;
+    return html`${this.selectItems.map((item) => this.renderSelect(item))}`;
   }
 
   private handleVacuumAction(
@@ -544,7 +557,7 @@ export class VacuumCard extends LitElement {
     const statsList = allStats[state] || allStats.default || [];
 
     const stats = statsList.map(
-      ({ entity_id, attribute, value_template, unit, subtitle }) => {
+      ({ entity_id, attribute, value_template, unit, subtitle, icon }) => {
         if (!entity_id && !attribute) {
           return nothing;
         }
@@ -571,6 +584,13 @@ export class VacuumCard extends LitElement {
 
         return html`
           <div class="stats-block" @click="${() => this.handleMore(entity_id)}">
+            ${
+              icon
+                ? html`<div class="stats-icon">
+                    <ha-icon icon=${icon}></ha-icon>
+                  </div>`
+                : nothing
+            }
             <span class="stats-value">${value}</span>
             ${unit}
             <div class="stats-subtitle">${subtitle}</div>

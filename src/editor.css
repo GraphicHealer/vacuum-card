@@ -40,6 +40,28 @@
   }
 }
 
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  .items-title {
+    font-weight: 500;
+  }
+
+  .item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 0;
+
+    ha-form {
+      align-self: stretch;
+    }
+  }
+}
+
 .card-config {
   flex-direction: column;
   display: flex;
