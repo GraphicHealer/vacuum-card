@@ -17,7 +17,7 @@ Only native speaker can translate to specific language.
 
 1. Clone this repo to wherever you want:
    ```sh
-   git clone https://github.com/denysdovhan/vacuum-card.git
+   git clone https://github.com/GraphicHealer/vacuum-card.git
    ```
 2. Go into the repo folder:
    ```sh
