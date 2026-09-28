@@ -12,7 +12,12 @@ import registerTemplates from 'ha-template';
 import get from 'lodash/get';
 import localize from './localize';
 import styles from './styles.css';
-import buildConfig from './config';
+import buildConfig, {
+  SHORTCUT_STATES,
+  TOOLBAR_BUTTONS,
+  isShownIn,
+  vacuumStateGroup,
+} from './config';
 import {
   Template,
   VacuumCardAction,
@@ -29,10 +34,10 @@ import {
   SelectEntity,
 } from './types';
 import {
-  ValetudoEntities,
-  findValetudoEntities,
+  DetectedEntities,
+  findVacuumEntities,
   getDefaultSelects,
-  getValetudoStats,
+  getDetectedStats,
   normalizeSelect,
 } from './valetudo';
 import DEFAULT_IMAGE from './vacuum.svg';
@@ -63,9 +68,9 @@ export class VacuumCard extends LitElement {
   @state() private requestInProgress = false;
 
   private thumbUpdater: ReturnType<typeof setInterval> | null = null;
-  private valetudoCache: {
+  private detectedCache: {
     key: unknown[];
-    value: ValetudoEntities | null;
+    value: DetectedEntities | null;
   } | null = null;
 
   static get styles(): CSSResultGroup {
@@ -96,7 +101,7 @@ export class VacuumCard extends LitElement {
     return this.hass.states[this.config.map];
   }
 
-  get valetudo(): ValetudoEntities | null {
+  get detected(): DetectedEntities | null {
     if (!this.hass || !this.config) {
       return null;
     }
@@ -109,16 +114,16 @@ export class VacuumCard extends LitElement {
     ];
 
     if (
-      !this.valetudoCache ||
-      this.valetudoCache.key.some((value, i) => value !== key[i])
+      !this.detectedCache ||
+      this.detectedCache.key.some((value, i) => value !== key[i])
     ) {
-      this.valetudoCache = {
+      this.detectedCache = {
         key,
-        value: findValetudoEntities(this.hass, this.config),
+        value: findVacuumEntities(this.hass, this.config),
       };
     }
 
-    return this.valetudoCache.value;
+    return this.detectedCache.value;
   }
 
   get batteryEntity(): VacuumBatteryEntity | null {
@@ -129,7 +134,7 @@ export class VacuumCard extends LitElement {
     const batteryEntityId =
       this.config.battery_entity ||
       (this.entity?.attributes.battery_level == null
-        ? (this.valetudo?.battery ?? this.findDeviceBatteryEntity())
+        ? (this.detected?.battery ?? this.findDeviceBatteryEntity())
         : undefined);
 
     if (!batteryEntityId) {
@@ -141,16 +146,16 @@ export class VacuumCard extends LitElement {
   get selectItems(): VacuumCardSelect[] {
     return (
       this.config.selects ??
-      getDefaultSelects(this.hass, this.config.entity, this.valetudo)
+      getDefaultSelects(this.hass, this.config.entity, this.detected)
     ).map(normalizeSelect);
   }
 
-  get stats(): Record<string, VacuumCardStat[]> {
-    if (this.config.stats || !this.valetudo) {
-      return this.config.stats ?? {};
+  get stats(): VacuumCardStat[] {
+    if (this.config.stats || !this.detected) {
+      return this.config.stats ?? [];
     }
 
-    return getValetudoStats(this.hass, this.valetudo, {
+    return getDetectedStats(this.hass, this.detected, {
       cleaningTime: localize('stats.cleaning_time') ?? 'Cleaning time',
       cleanedArea: localize('stats.cleaned_area') ?? 'Cleaned area',
     });
@@ -171,10 +176,8 @@ export class VacuumCard extends LitElement {
   }
 
   private getWatchedEntityIds(): string[] {
-    const valetudo = this.valetudo;
-    const statEntities = Object.values(this.stats)
-      .flat()
-      .map((stat) => stat.entity_id);
+    const valetudo = this.detected;
+    const statEntities = this.stats.map((stat) => stat.entity_id);
 
     return [
       this.config.entity,
@@ -466,11 +469,12 @@ export class VacuumCard extends LitElement {
     params: VacuumActionParams = { request: true },
   ) {
     return () => {
-      if (!this.config.actions[action]) {
+      const override = this.config.actions[action];
+      if (!override?.action) {
         return this.callVacuumService(params.defaultService || action, params);
       }
 
-      this.callService(this.config.actions[action]);
+      this.callService({ ...override, action: override.action });
       if (params.request) {
         this.requestInProgress = true;
         this.requestUpdate();
@@ -567,8 +571,9 @@ export class VacuumCard extends LitElement {
   }
 
   private renderStats(state: VacuumEntityState): Template {
-    const allStats = this.stats;
-    const statsList = allStats[state] || allStats.default || [];
+    const statsList = this.stats.filter(({ states }) =>
+      isShownIn(state, states),
+    );
 
     const stats = statsList.map(
       ({ entity_id, attribute, value_template, unit, subtitle, icon }) => {
@@ -631,7 +636,7 @@ export class VacuumCard extends LitElement {
   }
 
   private getValetudoStatus(): string | undefined {
-    const valetudo = this.valetudo;
+    const valetudo = this.detected;
     if (!valetudo) {
       return undefined;
     }
@@ -693,134 +698,65 @@ export class VacuumCard extends LitElement {
       return nothing;
     }
 
-    switch (state) {
-      case 'on':
-      case 'auto':
-      case 'spot':
-      case 'edge':
-      case 'single_room':
-      case 'cleaning': {
-        return html`
-          <div class="toolbar">
-            <button
-              class="toolbar-button"
-              @click="${this.handleVacuumAction('pause')}"
-            >
-              <ha-icon icon="hass:pause"></ha-icon>
-              ${localize('common.pause')}
-            </button>
-            <button
-              class="toolbar-button"
-              @click="${this.handleVacuumAction('stop')}"
-            >
-              <ha-icon icon="hass:stop"></ha-icon>
-              ${localize('common.stop')}
-            </button>
-            <button
-              class="toolbar-button"
-              @click="${this.handleVacuumAction('return_to_base')}"
-            >
-              <ha-icon icon="hass:home-map-marker"></ha-icon>
-              ${localize('common.return_to_base')}
-            </button>
-          </div>
-        `;
-      }
-
-      case 'paused': {
-        return html`
-          <div class="toolbar">
-            <button
-              class="toolbar-button"
-              @click="${this.handleVacuumAction('resume', {
-                defaultService: 'start',
-                request: true,
-              })}"
-            >
-              <ha-icon icon="hass:play"></ha-icon>
-              ${localize('common.continue')}
-            </button>
-            <button
-              class="toolbar-button"
-              @click="${this.handleVacuumAction('return_to_base')}"
-            >
-              <ha-icon icon="hass:home-map-marker"></ha-icon>
-              ${localize('common.return_to_base')}
-            </button>
-          </div>
-        `;
-      }
-
-      case 'returning': {
-        return html`
-          <div class="toolbar">
-            <button
-              class="toolbar-button"
-              @click="${this.handleVacuumAction('resume', {
-                defaultService: 'start',
-                request: true,
-              })}"
-            >
-              <ha-icon icon="hass:play"></ha-icon>
-              ${localize('common.continue')}
-            </button>
-            <button
-              class="toolbar-button"
-              @click="${this.handleVacuumAction('pause')}"
-            >
-              <ha-icon icon="hass:pause"></ha-icon>
-              ${localize('common.pause')}
-            </button>
-          </div>
-        `;
-      }
-      case 'docked':
-      case 'idle':
-      default: {
-        const buttons = this.config.shortcuts.map(
-          ({ name, action, icon, data, target }) => {
-            const execute = () => {
-              if (action) {
-                return this.callService({ action, data, target });
-              }
-            };
-            return html`
-              <ha-icon-button label="${name}" @click="${execute}">
+    const group = vacuumStateGroup(state);
+    const active = ['cleaning', 'paused', 'returning'].includes(group);
+    const buttons = Object.entries(TOOLBAR_BUTTONS)
+      .filter(([key, { states }]) =>
+        isShownIn(state, this.config.actions[key]?.states, states),
+      )
+      .map(([key, { icon }]) => {
+        const label = localize(
+          key === 'start' && (group === 'paused' || group === 'returning')
+            ? 'common.continue'
+            : `common.${key}`,
+        );
+        const onClick = this.handleVacuumAction(key, {
+          request: key !== 'locate',
+        });
+        return active
+          ? html`
+              <button class="toolbar-button" @click="${onClick}">
+                <ha-icon icon="${icon}"></ha-icon>
+                ${label}
+              </button>
+            `
+          : html`
+              <ha-icon-button label="${label}" @click="${onClick}">
                 <ha-icon icon="${icon}"></ha-icon>
               </ha-icon-button>
             `;
-          },
-        );
+      });
 
-        const dockButton = html`
-          <ha-icon-button
-            label="${localize('common.return_to_base')}"
-            @click="${this.handleVacuumAction('return_to_base')}"
-            ><ha-icon icon="hass:home-map-marker"></ha-icon>
+    const shortcuts = this.config.shortcuts
+      .filter(({ states }) => isShownIn(state, states, SHORTCUT_STATES))
+      .map(({ name, action, icon, data, target }) => {
+        const execute = () => {
+          if (action) {
+            return this.callService({ action, data, target });
+          }
+        };
+        return html`
+          <ha-icon-button label="${name}" @click="${execute}">
+            <ha-icon icon="${icon}"></ha-icon>
           </ha-icon-button>
         `;
+      });
 
-        return html`
-          <div class="toolbar">
-            <ha-icon-button
-              label="${localize('common.start')}"
-              @click="${this.handleVacuumAction('start')}"
-              ><ha-icon icon="hass:play"></ha-icon>
-            </ha-icon-button>
-
-            <ha-icon-button
-              label="${localize('common.locate')}"
-              @click="${this.handleVacuumAction('locate', { request: false })}"
-              ><ha-icon icon="mdi:map-marker"></ha-icon>
-            </ha-icon-button>
-
-            ${state === 'idle' ? dockButton : ''}
-            <div class="fill-gap"></div>
-            ${buttons}
-          </div>
-        `;
-      }
+    if (!buttons.length && !shortcuts.length) {
+      return nothing;
     }
+
+    return html`
+      <div class="toolbar">
+        ${buttons}
+        ${
+          shortcuts.length
+            ? html`<div class="fill-gap"></div>
+                ${shortcuts}`
+            : nothing
+        }
+      </div>
+    `;
   }
 
   private renderUnavailable(): Template {

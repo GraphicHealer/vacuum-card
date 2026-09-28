@@ -47,6 +47,7 @@ export interface VacuumCardStat {
   unit?: string;
   subtitle?: string;
   icon?: string;
+  states?: string[];
 }
 
 export interface VacuumCardSelect {
@@ -62,12 +63,17 @@ export interface VacuumCardAction {
   target?: HassServiceTarget;
 }
 
+export interface VacuumCardToolbarAction extends Partial<VacuumCardAction> {
+  states?: string[];
+}
+
 export interface VacuumCardShortcut {
   name?: string;
   icon?: string;
   action?: string;
   data?: Record<string, unknown>;
   target?: HassServiceTarget;
+  states?: string[];
 }
 
 export interface VacuumCardConfig {
@@ -82,8 +88,8 @@ export interface VacuumCardConfig {
   show_status: boolean;
   show_toolbar: boolean;
   compact_view: boolean;
-  stats?: Record<string, VacuumCardStat[]>;
-  actions: Record<string, VacuumCardAction>;
+  stats?: VacuumCardStat[];
+  actions: Record<string, VacuumCardToolbarAction>;
   shortcuts: VacuumCardShortcut[];
 }
 
@@ -100,6 +106,7 @@ export interface EntityRegistryDisplayEntry {
   name?: string | null;
   device_id?: string;
   platform?: string;
+  hidden?: boolean;
 }
 
 export interface DeviceRegistryEntry {

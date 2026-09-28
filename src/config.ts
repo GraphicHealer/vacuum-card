@@ -1,5 +1,73 @@
 import localize from './localize';
-import { VacuumCardConfig } from './types';
+import { VacuumCardConfig, VacuumCardStat } from './types';
+
+export const VACUUM_STATES = [
+  'cleaning',
+  'docked',
+  'idle',
+  'paused',
+  'returning',
+  'error',
+];
+
+const CLEANING_STATES = ['on', 'auto', 'spot', 'edge', 'single_room'];
+
+export const TOOLBAR_BUTTONS: Record<
+  string,
+  { icon: string; states: string[] }
+> = {
+  start: {
+    icon: 'hass:play',
+    states: ['docked', 'idle', 'paused', 'returning', 'error'],
+  },
+  pause: { icon: 'hass:pause', states: ['cleaning', 'returning'] },
+  stop: { icon: 'hass:stop', states: ['cleaning'] },
+  locate: { icon: 'mdi:map-marker', states: ['docked', 'idle', 'error'] },
+  return_to_base: {
+    icon: 'hass:home-map-marker',
+    states: ['cleaning', 'paused', 'idle'],
+  },
+};
+
+export const SHORTCUT_STATES = ['docked', 'idle', 'error'];
+
+export function vacuumStateGroup(state: string): string {
+  return CLEANING_STATES.includes(state) ? 'cleaning' : state;
+}
+
+export function isShownIn(
+  state: string,
+  states?: string[],
+  fallback?: string[],
+): boolean {
+  const list = states ?? fallback;
+  return (
+    !list || list.includes(state) || list.includes(vacuumStateGroup(state))
+  );
+}
+
+type LegacyStats = Record<string, VacuumCardStat[]>;
+
+export function normalizeStats(
+  stats?: VacuumCardStat[] | LegacyStats,
+): VacuumCardStat[] | undefined {
+  if (!stats || Array.isArray(stats)) {
+    return stats;
+  }
+
+  const own = Object.keys(stats).filter((key) => key !== 'default');
+  return Object.entries(stats).flatMap(([key, list]) => {
+    const states =
+      key !== 'default'
+        ? [key]
+        : own.length
+          ? VACUUM_STATES.filter((state) => !own.includes(state))
+          : undefined;
+    return (Array.isArray(list) ? list : []).map((stat) =>
+      states ? { ...stat, states } : stat,
+    );
+  });
+}
 
 export default function buildConfig(
   config?: Partial<VacuumCardConfig>,
@@ -29,7 +97,9 @@ export default function buildConfig(
     show_status: config.show_status ?? true,
     show_toolbar: config.show_toolbar ?? true,
     compact_view: config.compact_view ?? false,
-    stats: config.stats,
+    stats: normalizeStats(
+      config.stats as VacuumCardStat[] | LegacyStats | undefined,
+    ),
     actions: config.actions ?? {},
     shortcuts: config.shortcuts ?? [],
   };

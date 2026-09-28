@@ -1,15 +1,10 @@
-[![SWUbanner](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner-direct-single.svg)](https://stand-with-ukraine.pp.ua/)
-
 # Vacuum Card
 
-[![npm version][npm-image]][npm-url]
 [![hacs][hacs-image]][hacs-url]
-[![GitHub Sponsors][gh-sponsors-image]][gh-sponsors-url]
-[![Patreon][patreon-image]][patreon-url]
-[![Buy Me A Coffee][buymeacoffee-image]][buymeacoffee-url]
-[![Twitter][twitter-image]][twitter-url]
 
 > Vacuum cleaner card for [Home Assistant][home-assistant] Lovelace UI
+
+This is a fork of [denysdovhan/vacuum-card][upstream], modified for better compatibility and more options with more vacuums, including [Valetudo][valetudo]: a visual editor for every option, status-based visibility for buttons, shortcuts and sensors, header dropdowns, room shortcuts from Home Assistant's area mapping, and auto-detection of the vacuum's related entities.
 
 By default, Home Assistant does not provide any card for controlling vacuum cleaners. This card displays the state and allows to control your robot.
 
@@ -17,17 +12,13 @@ By default, Home Assistant does not provide any card for controlling vacuum clea
 
 ## Installing
 
-**💡 Tip:** If you like this project, consider giving me a tip for the time I spent building this project:
-
-<a href="https://www.buymeacoffee.com/denysdovhan" target="_blank">
-  <img src="https://cdn.buymeacoffee.com/buttons/default-black.png" alt="Buy Me A Coffee" width="150px">
-</a>
-
 ### HACS
 
-This card is available in [HACS][hacs] (Home Assistant Community Store).
+Add this repository to [HACS][hacs] (Home Assistant Community Store) as a custom repository:
 
-Just search for `Vacuum Card` in plugins tab.
+1. In HACS, open the menu (⋮) and choose **Custom repositories**.
+2. Enter `https://github.com/GraphicHealer/vacuum-card` and pick the **Dashboard** type.
+3. Search for `Vacuum Card` and download it.
 
 ### Manual
 
@@ -58,11 +49,13 @@ This card can be configured using Lovelace UI editor.
 6. Optionally pick a battery sensor and map camera, add **Header Dropdowns** (fan speed, plus `select` entities such as cleaning mode or water level), **Sensors** (stats) and **Shortcuts**, each with its own name, icon and options.
 7. Now you should see the preview of the card!
 
-For a Valetudo vacuum, the editor writes everything it detects (battery sensor, header dropdowns and sensors) into the card config, so you can edit or remove any of it in the editor or in YAML.
+For any vacuum, the editor writes everything it detects into the card config, so you can edit or remove any of it in the editor or in YAML. It picks the vacuum device's battery sensor (if the vacuum has no `battery_level` attribute), its `select` entities as header dropdowns, and consumable (brush, filter, mop, …) and cleaning time / area sensors as sensors. Valetudo robots get [more specific detection](#valetudo).
 
 Shortcuts use Home Assistant's action picker: choose an action (e.g. `mqtt.publish`) and its fields and target are shown for you to fill in. It is saved in the same `action` / `data` / `target` format as automations.
 
-The collapsible **Toolbar Actions** section sets what the main buttons (start, pause, resume, stop, locate, return to base) do. The editor fills each one with its standard vacuum action (e.g. `vacuum.start` targeting your vacuum), so you can change it with the same action picker. A button whose action is cleared falls back to the standard vacuum action.
+The collapsible **Toolbar Actions** section sets what the main buttons (clean / continue, pause, stop, locate, return to base) do and when they show. The editor fills each one with its standard vacuum action (e.g. `vacuum.start` targeting your vacuum) and the vacuum statuses it normally shows for, so you can change both. A button whose action is cleared falls back to the standard vacuum action.
+
+Toolbar actions, sensors and shortcuts each have a **Show when status is** checklist (`states` in YAML) with the vacuum statuses `cleaning`, `docked`, `idle`, `paused`, `returning` and `error`.
 
 Typical example of using this card in YAML config would look like this:
 
@@ -81,23 +74,17 @@ actions:
       entity_id: vacuum.vacuum_cleaner
       segments: [16, 20]
 stats:
-  default:
-    - attribute: filter_left
-      unit: hours
-      subtitle: Filter
-    - attribute: side_brush_left
-      unit: hours
-      subtitle: Side brush
-    - attribute: main_brush_left
-      unit: hours
-      subtitle: Main brush
-    - attribute: sensor_dirty_left
-      unit: hours
-      subtitle: Sensors
-  cleaning:
-    - entity_id: sensor.vacuum_main_brush_left
-      value_template: '{{ (value | float(0) / 3600) | round(1) }}'
-      subtitle: Main brush
+  - attribute: filter_left
+    unit: hours
+    subtitle: Filter
+  - attribute: side_brush_left
+    unit: hours
+    subtitle: Side brush
+  - entity_id: sensor.vacuum_main_brush_left
+    value_template: '{{ (value | float(0) / 3600) | round(1) }}'
+    subtitle: Main brush
+    states:
+      - cleaning
       unit: hours
     - attribute: cleaning_time
       unit: minutes
@@ -129,10 +116,10 @@ Here is what every option means:
 | `show_status`    | `boolean` | `true`       | Show status of the vacuum.                                                                                |
 | `show_toolbar`   | `boolean` | `true`       | Show toolbar with actions.                                                                                |
 | `compact_view`   | `boolean` | `false`      | Compact view without image.                                                                               |
-| `stats`          | `object`  | Optional     | Custom per state stats for your vacuum cleaner                                                            |
-| `actions`        | `object`  | Optional     | Override default actions behavior with service invocations.                                               |
+| `stats`          |  `array`  | Optional     | Stats (sensors) for your vacuum cleaner, each optionally limited to some vacuum statuses.                 |
+| `actions`        | `object`  | Optional     | Override what the toolbar buttons do and when they show.                                                  |
 | `shortcuts`      |  `array`  | Optional     | List of shortcuts shown at the right bottom part of the card with custom actions for your vacuum cleaner. |
-| `valetudo`       | `boolean` | `true`       | Valetudo auto-detection. Set `false` to disable.                                                          |
+| `valetudo`       | `boolean` | `true`       | Valetudo-specific auto-detection. Set `false` to use the generic detection instead.                       |
 
 ### Header dropdowns (`selects`)
 
@@ -165,7 +152,7 @@ selects:
   - select.robot_water
 ```
 
-- Leave `selects` out to use the auto-detected dropdowns: fan speed (if the vacuum has fan speeds) plus Valetudo's mode and water selects (see below). The visual editor writes them into `selects` so you can edit or remove them.
+- Leave `selects` out to use the auto-detected dropdowns: fan speed (if the vacuum has fan speeds) plus the vacuum device's `select` entities (for Valetudo, only mode and water; see below). The visual editor writes them into `selects` so you can edit or remove them.
 - List only the entities you want to show; anything not listed is hidden.
 - `selects: []` hides all select dropdowns.
 - A select whose entity doesn't exist or has no options is not shown.
@@ -186,12 +173,12 @@ The card then uses these entities from the same device, if the robot has them:
 | `sensor.*_battery_level`                        | Battery level and icon                                                | `battery_entity` |
 | `select.*_mode`, `select.*_water`               | Mode and water dropdowns                                              | `selects`        |
 | `sensor.*_error`, `sensor.*_status_flag`        | More detailed status (e.g. _Segment cleaning_, the actual error text) | —                |
-| Consumable sensors (`mdi:progress-wrench`)      | Default stats (hours / % remaining)                                   | `stats`          |
-| `sensor.*_current_statistics_time` / `..._area` | Stats while cleaning (minutes, m²)                                    | `stats`          |
+| Consumable sensors (`mdi:progress-wrench`)      | Sensors while not cleaning (hours / % remaining)                      | `stats`          |
+| `sensor.*_current_statistics_time` / `..._area` | Sensors while cleaning (minutes, m²)                                  | `stats`          |
 
-Anything you configure explicitly takes precedence. The visual editor writes the detected `battery_entity`, `selects` and `stats` into the card config, so you can change icons, names and options or remove items. Use `selects: []` or `stats: {}` to show none; if a key is left out entirely, the card falls back to auto-detection.
+Anything you configure explicitly takes precedence. The visual editor writes the detected `battery_entity`, `selects` and `stats` into the card config, so you can change icons, names and options or remove items. Use `selects: []` or `stats: []` to show none; if a key is left out entirely, the card falls back to auto-detection.
 
-Set `valetudo: false` to turn off auto-detection completely.
+Set `valetudo: false` to use the generic detection described under [Usage](#usage) instead.
 
 ### Room shortcuts
 
@@ -215,9 +202,9 @@ shortcuts:
         - living_room
 ```
 
-### `stats` object
+### `stats` array
 
-You can use any attribute of vacuum or even any entity by `entity_id` to display by stats section. You can also combine `attribute` with `entity_id` to extract an attribute value of specific entity. Stats are grouped by vacuum state (e.g. `cleaning`); `default` is used for any state without its own list. In the visual editor these are the **Sensors** lists.
+You can use any attribute of vacuum or even any entity by `entity_id` to display by stats section. You can also combine `attribute` with `entity_id` to extract an attribute value of specific entity. Use `states` to show a stat only for some vacuum statuses; without it the stat is always shown. In the visual editor this is the **Sensors** list.
 
 | Name             |   Type   | Default  | Description                                                                                          |
 | ---------------- | :------: | -------- | ---------------------------------------------------------------------------------------------------- |
@@ -227,10 +214,11 @@ You can use any attribute of vacuum or even any entity by `entity_id` to display
 | `unit`           | `string` | Optional | Unit of measure, i.e. `hours`.                                                                       |
 | `subtitle`       | `string` | Optional | Friendly name of the stat, i.e. `Filter`.                                                            |
 | `icon`           | `string` | Optional | Icon shown above the value, i.e. `mdi:air-filter`.                                                   |
+| `states`         | `array`  | Optional | Vacuum statuses to show the stat for, i.e. `[cleaning]`. Always shown if omitted.                    |
 
 ### `actions` object
 
-You can define action calls to override default actions behavior. Available actions to override are `start`, `pause`, `resume`, `stop`, `locate` and `return_to_base`. They use the same `action` / `data` / `target` format as automations, and the visual editor pre-fills them with the standard vacuum actions:
+You can define action calls to override default actions behavior. Available actions to override are `start` (also shown as Continue while paused or returning), `pause`, `stop`, `locate` and `return_to_base`. They use the same `action` / `data` / `target` format as automations, and the visual editor pre-fills them with the standard vacuum actions:
 
 ```yaml
 actions:
@@ -238,25 +226,30 @@ actions:
     action: vacuum.start
     target:
       entity_id: vacuum.robot
+    states:
+      - docked
+      - idle
 ```
 
-| Name     |   Type   | Default      | Description                                                    |
-| -------- | :------: | ------------ | -------------------------------------------------------------- |
-| `action` | `string` | **Required** | An action to call, i.e. `script.clean_bedroom`.                |
-| `data`   | `object` | Optional     | Data for the action call.                                      |
-| `target` | `object` | Optional     | A `HassServiceTarget`, to define a target for the action call. |
+| Name     |   Type   | Default  | Description                                                                                                                                                                                                                  |
+| -------- | :------: | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `action` | `string` | Optional | An action to call, i.e. `script.clean_bedroom`. Defaults to the standard vacuum action.                                                                                                                                      |
+| `states` | `array`  | Optional | Vacuum statuses to show the button for; `[]` hides it. Defaults: `start` docked/idle/paused/returning/error, `pause` cleaning/returning, `stop` cleaning, `locate` docked/idle/error, `return_to_base` cleaning/paused/idle. |
+| `data`   | `object` | Optional | Data for the action call.                                                                                                                                                                                                    |
+| `target` | `object` | Optional | A `HassServiceTarget`, to define a target for the action call.                                                                                                                                                               |
 
 ### `shortcuts` object
 
 You can defined [custom scripts][ha-scripts] for custom actions i.e cleaning specific room and add them to this card with `shortcuts` option.
 
-| Name     |   Type   | Default  | Description                                                    |
-| -------- | :------: | -------- | -------------------------------------------------------------- |
-| `name`   | `string` | Optional | Friendly name of the action, i.e. `Clean bedroom`.             |
-| `action` | `string` | Optional | An action to call, i.e. `script.clean_bedroom`.                |
-| `data`   | `object` | Optional | Data for the action call.                                      |
-| `target` | `object` | Optional | A `HassServiceTarget`, to define a target for the action call. |
-| `icon`   | `string` | Optional | Any icon for action button.                                    |
+| Name     |   Type   | Default  | Description                                                                   |
+| -------- | :------: | -------- | ----------------------------------------------------------------------------- |
+| `name`   | `string` | Optional | Friendly name of the action, i.e. `Clean bedroom`.                            |
+| `action` | `string` | Optional | An action to call, i.e. `script.clean_bedroom`.                               |
+| `data`   | `object` | Optional | Data for the action call.                                                     |
+| `target` | `object` | Optional | A `HassServiceTarget`, to define a target for the action call.                |
+| `icon`   | `string` | Optional | Any icon for action button.                                                   |
+| `states` | `array`  | Optional | Vacuum statuses to show the shortcut for. Defaults to docked, idle and error. |
 
 ## Theming
 
@@ -383,22 +376,12 @@ Huge thanks for their ideas and efforts 👍
 
 ## License
 
-MIT © [Denys Dovhan][denysdovhan]
+MIT © [Denys Dovhan][denysdovhan], modified by [GraphicHealer][graphichealer]
 
 <!-- Badges -->
 
-[npm-url]: https://npmjs.org/package/vacuum-card
-[npm-image]: https://img.shields.io/npm/v/vacuum-card.svg?style=flat-square
 [hacs-url]: https://github.com/hacs/integration
-[hacs-image]: https://img.shields.io/badge/hacs-default-orange.svg?style=flat-square
-[gh-sponsors-url]: https://github.com/sponsors/denysdovhan
-[gh-sponsors-image]: https://img.shields.io/github/sponsors/denysdovhan?style=flat-square
-[patreon-url]: https://patreon.com/denysdovhan
-[patreon-image]: https://img.shields.io/badge/support-patreon-F96854.svg?style=flat-square
-[buymeacoffee-url]: https://patreon.com/denysdovhan
-[buymeacoffee-image]: https://img.shields.io/badge/support-buymeacoffee-222222.svg?style=flat-square
-[twitter-url]: https://x.com/denysdovhan
-[twitter-image]: https://img.shields.io/badge/follow-%40denysdovhan-000000.svg?style=flat-square
+[hacs-image]: https://img.shields.io/badge/hacs-custom-orange.svg?style=flat-square
 
 <!-- References -->
 
@@ -408,11 +391,13 @@ MIT © [Denys Dovhan][denysdovhan]
 [preview-image]: https://github.com/denysdovhan/vacuum-card/assets/3459374/43808d3d-65a4-4e65-9531-4f248fa8861c
 [cleaning-gif]: https://user-images.githubusercontent.com/3459374/81119202-fa60b500-8f32-11ea-9b23-325efa93d7ab.gif
 [returning-gif]: https://user-images.githubusercontent.com/3459374/81119452-765afd00-8f33-11ea-9dc5-9c26ba3f8c45.gif
-[latest-release]: https://github.com/denysdovhan/vacuum-card/releases/latest
+[latest-release]: https://github.com/GraphicHealer/vacuum-card/releases/latest
 [ha-scripts]: https://www.home-assistant.io/docs/scripts/
-[edit-readme]: https://github.com/denysdovhan/vacuum-card/edit/main/README.md
+[edit-readme]: https://github.com/GraphicHealer/vacuum-card/edit/main/README.md
 [card-mod]: https://github.com/thomasloven/lovelace-card-mod
-[add-translation]: https://github.com/denysdovhan/vacuum-card/blob/master/CONTRIBUTING.md#how-to-add-translation
+[add-translation]: https://github.com/GraphicHealer/vacuum-card/blob/main/CONTRIBUTING.md#how-to-add-translation
 [macbury-smart-house]: https://macbury.github.io/SmartHouse/HomeAssistant/Vacuum/
 [bbbenji-card]: https://gist.github.com/bbbenji/24372e423f8669b2e6713638d8f8ceb2
 [denysdovhan]: https://denysdovhan.com
+[graphichealer]: https://github.com/GraphicHealer
+[upstream]: https://github.com/denysdovhan/vacuum-card

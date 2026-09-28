@@ -4,15 +4,16 @@ import {
   VacuumCardSelect,
   VacuumCardStat,
 } from './types';
+import { VACUUM_STATES } from './config';
 
-export interface ValetudoEntities {
+export interface DetectedEntities {
   vacuum: string;
   deviceName: string;
+  valetudo: boolean;
   battery?: string;
   error?: string;
   statusFlag?: string;
-  water?: string;
-  mode?: string;
+  selects: string[];
   currentTime?: string;
   currentArea?: string;
   consumables: string[];
@@ -20,6 +21,9 @@ export interface ValetudoEntities {
 
 const CONSUMABLE_PATTERN =
   /(brush|filter|sensor|cleaning|mop|detergent|bin|wheel|dock)$/;
+const GENERIC_CONSUMABLE_PATTERN =
+  /(brush|filter|sensor_dirty|mop|pad|detergent|dust_bag|wheel)/;
+const CONSUMABLE_UNITS = ['%', 'h', 'min', 's'];
 
 function objectId(entityId: string): string {
   return entityId.split('.')[1] ?? '';
@@ -32,7 +36,7 @@ function relatedEntityIds(
 ): string[] {
   if (deviceId && hass.entities) {
     return Object.values(hass.entities)
-      .filter((entry) => entry.device_id === deviceId)
+      .filter((entry) => entry.device_id === deviceId && !entry.hidden)
       .map((entry) => entry.entity_id)
       .filter((id) => id in hass.states);
   }
@@ -57,29 +61,27 @@ function findBySuffix(
     .sort((a, b) => a.length - b.length)[0];
 }
 
-export function findValetudoEntities(
+export function findVacuumEntities(
   hass: ExtendedHomeAssistant,
   config: Pick<VacuumCardConfig, 'entity' | 'valetudo'>,
-): ValetudoEntities | null {
-  if (config.valetudo === false) {
-    return null;
-  }
-
+): DetectedEntities {
   const vacuumId = config.entity;
   const deviceId = hass.entities?.[vacuumId]?.device_id;
   const device = deviceId ? hass.devices?.[deviceId] : undefined;
+  const deviceName = device?.name_by_user ?? device?.name ?? '';
 
   const isValetudo =
-    device?.manufacturer === 'Valetudo' ||
-    vacuumId.startsWith('vacuum.valetudo_');
-
-  if (!isValetudo) {
-    return null;
-  }
+    config.valetudo !== false &&
+    (device?.manufacturer === 'Valetudo' ||
+      vacuumId.startsWith('vacuum.valetudo_'));
 
   const candidates = relatedEntityIds(hass, vacuumId, device?.id);
   const find = (domain: string, suffix: string) =>
     findBySuffix(candidates, vacuumId, domain, suffix);
+
+  if (!isValetudo) {
+    return findGenericEntities(hass, vacuumId, deviceName, candidates, find);
+  }
 
   const excluded = new Set(
     [
@@ -102,33 +104,68 @@ export function findValetudoEntities(
 
   return {
     vacuum: vacuumId,
-    deviceName: device?.name_by_user ?? device?.name ?? '',
+    deviceName,
+    valetudo: true,
     battery: find('sensor', 'battery_level'),
     error: find('sensor', 'error'),
     statusFlag: find('sensor', 'status_flag'),
-    water: find('select', 'water'),
-    mode: find('select', 'mode'),
+    selects: [find('select', 'mode'), find('select', 'water')].filter(
+      (id): id is string => !!id,
+    ),
     currentTime: find('sensor', 'current_statistics_time'),
     currentArea: find('sensor', 'current_statistics_area'),
     consumables,
   };
 }
 
-export function getValetudoSelects(
-  valetudo: ValetudoEntities | null,
-): string[] {
-  return [valetudo?.mode, valetudo?.water].filter((id): id is string => !!id);
+function findGenericEntities(
+  hass: ExtendedHomeAssistant,
+  vacuumId: string,
+  deviceName: string,
+  candidates: string[],
+  find: (domain: string, suffix: string) => string | undefined,
+): DetectedEntities {
+  const sensors = candidates.filter((id) => id.startsWith('sensor.'));
+  const battery = sensors.find(
+    (id) => hass.states[id].attributes.device_class === 'battery',
+  );
+  const currentTime = find('sensor', 'cleaning_time');
+  const currentArea = find('sensor', 'cleaning_area');
+  const excluded = new Set([battery, currentTime, currentArea]);
+
+  const consumables = sensors.filter((id) => {
+    const unit = hass.states[id].attributes.unit_of_measurement;
+    return (
+      !excluded.has(id) &&
+      typeof unit === 'string' &&
+      CONSUMABLE_UNITS.includes(unit) &&
+      GENERIC_CONSUMABLE_PATTERN.test(objectId(id))
+    );
+  });
+
+  return {
+    vacuum: vacuumId,
+    deviceName,
+    valetudo: false,
+    battery,
+    selects: candidates.filter(
+      (id) => id.startsWith('select.') || id.startsWith('input_select.'),
+    ),
+    currentTime,
+    currentArea,
+    consumables,
+  };
 }
 
 export function getDefaultSelects(
   hass: ExtendedHomeAssistant,
   entity: string,
-  valetudo: ValetudoEntities | null,
+  detected: DetectedEntities | null,
 ): string[] {
   const fanSpeeds = hass.states[entity]?.attributes.fan_speed_list;
   return [
     ...(Array.isArray(fanSpeeds) && fanSpeeds.length ? [entity] : []),
-    ...getValetudoSelects(valetudo),
+    ...(detected?.selects ?? []),
   ];
 }
 
@@ -156,71 +193,99 @@ function stripDeviceName(
     : friendlyName;
 }
 
-export function getValetudoStats(
+function durationStat(
   hass: ExtendedHomeAssistant,
-  valetudo: ValetudoEntities,
-  labels: { cleaningTime: string; cleanedArea: string },
-): Record<string, VacuumCardStat[]> {
-  const consumableStats = valetudo.consumables.map((entity_id) => {
-    const isMinutes =
-      hass.states[entity_id].attributes.unit_of_measurement === 'min';
-    return {
-      entity_id,
-      ...(isMinutes && {
-        value_template: '{{ (value | float(0) / 60) | round(1) }}',
-      }),
-      unit: isMinutes ? 'h' : '%',
-      subtitle: stripDeviceName(hass, entity_id, valetudo.deviceName),
-    };
-  });
-
-  const cleaningStats: VacuumCardStat[] = [];
-  if (valetudo.currentTime) {
-    cleaningStats.push({
-      entity_id: valetudo.currentTime,
-      value_template: '{{ (value | float(0) / 60) | round(0) | int }}',
-      unit: 'min',
-      subtitle: labels.cleaningTime,
-    });
+  entityId: string,
+  target: 'h' | 'min',
+): Pick<VacuumCardStat, 'unit' | 'value_template'> {
+  const unit = hass.states[entityId]?.attributes.unit_of_measurement;
+  const divisors: Record<string, Record<string, number>> = {
+    h: { s: 3600, min: 60, h: 1 },
+    min: { s: 60, min: 1 },
+  };
+  const divisor = typeof unit === 'string' ? divisors[target][unit] : undefined;
+  if (!divisor) {
+    return typeof unit === 'string' ? { unit } : {};
   }
-  if (valetudo.currentArea) {
-    cleaningStats.push({
-      entity_id: valetudo.currentArea,
-      value_template: '{{ (value | float(0) / 10000) | round(1) }}',
-      unit: 'm²',
-      subtitle: labels.cleanedArea,
-    });
+  if (divisor === 1) {
+    return { unit: target };
   }
-
-  const stats: Record<string, VacuumCardStat[]> = {};
-  if (consumableStats.length) {
-    stats.default = consumableStats;
-  }
-  if (cleaningStats.length) {
-    stats.cleaning = cleaningStats;
-  }
-  return stats;
+  const rounding = target === 'h' ? 'round(1)' : 'round(0) | int';
+  return {
+    unit: target,
+    value_template: `{{ (value | float(0) / ${divisor}) | ${rounding} }}`,
+  };
 }
 
-export function getValetudoDefaults(
+export function getDetectedStats(
   hass: ExtendedHomeAssistant,
-  valetudo: ValetudoEntities | null,
+  detected: DetectedEntities,
   labels: { cleaningTime: string; cleanedArea: string },
-): Partial<Pick<VacuumCardConfig, 'battery_entity' | 'stats'>> {
-  if (!valetudo) {
-    return {};
+): VacuumCardStat[] {
+  const consumableStats = detected.consumables.map((entity_id) => ({
+    entity_id,
+    ...durationStat(hass, entity_id, 'h'),
+    subtitle: stripDeviceName(hass, entity_id, detected.deviceName),
+  }));
+
+  const cleaningStats: VacuumCardStat[] = [];
+  if (detected.currentTime) {
+    cleaningStats.push({
+      entity_id: detected.currentTime,
+      ...(detected.valetudo
+        ? {
+            value_template: '{{ (value | float(0) / 60) | round(0) | int }}',
+            unit: 'min',
+          }
+        : durationStat(hass, detected.currentTime, 'min')),
+      subtitle: labels.cleaningTime,
+      states: ['cleaning'],
+    });
+  }
+  if (detected.currentArea) {
+    const unit =
+      hass.states[detected.currentArea]?.attributes.unit_of_measurement;
+    cleaningStats.push({
+      entity_id: detected.currentArea,
+      ...(detected.valetudo
+        ? {
+            value_template: '{{ (value | float(0) / 10000) | round(1) }}',
+            unit: 'm²',
+          }
+        : typeof unit === 'string'
+          ? { unit }
+          : {}),
+      subtitle: labels.cleanedArea,
+      states: ['cleaning'],
+    });
   }
 
+  const notCleaning = cleaningStats.length
+    ? VACUUM_STATES.filter((state) => state !== 'cleaning')
+    : undefined;
+  return [
+    ...consumableStats.map((stat) =>
+      notCleaning ? { ...stat, states: notCleaning } : stat,
+    ),
+    ...cleaningStats,
+  ];
+}
+
+export function getDetectedDefaults(
+  hass: ExtendedHomeAssistant,
+  detected: DetectedEntities,
+  labels: { cleaningTime: string; cleanedArea: string },
+): Partial<Pick<VacuumCardConfig, 'battery_entity' | 'stats'>> {
   const defaults: Partial<Pick<VacuumCardConfig, 'battery_entity' | 'stats'>> =
     {};
   if (
-    valetudo.battery &&
-    hass.states[valetudo.vacuum]?.attributes.battery_level == null
+    detected.battery &&
+    hass.states[detected.vacuum]?.attributes.battery_level == null
   ) {
-    defaults.battery_entity = valetudo.battery;
+    defaults.battery_entity = detected.battery;
   }
-  const stats = getValetudoStats(hass, valetudo, labels);
-  if (Object.keys(stats).length) {
+  const stats = getDetectedStats(hass, detected, labels);
+  if (stats.length) {
     defaults.stats = stats;
   }
   return defaults;
