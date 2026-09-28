@@ -55,7 +55,7 @@ This card can be configured using Lovelace UI editor.
 3. Click Plus button to add a new card.
 4. Find _Custom: Vacuum Card_ in the list.
 5. Choose `entity`.
-6. Optionally pick a battery sensor and map camera, add **Header Dropdowns** (`select` entities such as cleaning mode or water level, shown next to fan speed), **Sensors** (stats) and **Shortcuts**, each with its own name, icon and options.
+6. Optionally pick a battery sensor and map camera, add **Header Dropdowns** (fan speed, plus `select` entities such as cleaning mode or water level), **Sensors** (stats) and **Shortcuts**, each with its own name, icon and options.
 7. Now you should see the preview of the card!
 
 For a Valetudo vacuum, the editor writes everything it detects (battery sensor, header dropdowns and sensors) into the card config, so you can edit or remove any of it in the editor or in YAML.
@@ -121,7 +121,7 @@ Here is what every option means:
 | `type`           | `string`  | **Required** | `custom:vacuum-card`                                                                                      |
 | `entity`         | `string`  | **Required** | An entity_id within the `vacuum` domain.                                                                  |
 | `battery_entity` | `string`  | Optional     | An entity_id within the `sensor` domain to display battery state and icon.                                |
-| `selects`        |  `array`  | Optional     | [Header dropdowns](#header-dropdowns-selects) next to fan speed (e.g. cleaning mode, water).              |
+| `selects`        |  `array`  | Optional     | [Header dropdowns](#header-dropdowns-selects) (fan speed, cleaning mode, water, …).                       |
 | `map`            | `string`  | Optional     | An entity_id within the `camera` or `image` domain, for streaming live vacuum map.                        |
 | `map_refresh`    | `integer` | `5`          | Update interval for map camera in seconds                                                                 |
 | `image`          | `string`  | `default`    | Path to image of your vacuum cleaner. Better to have `png` or `svg`.                                      |
@@ -136,21 +136,27 @@ Here is what every option means:
 
 ### Header dropdowns (`selects`)
 
-Each item in `selects` is rendered as a dropdown in the header, next to fan speed. Use it for things like cleaning mode (vacuum / mop / vacuum and mop), water level or mop intensity. Options are read live from the entity's `options` attribute and the icon comes from the entity itself, so any integration's options work. Picking an option calls `select.select_option` (or `input_select.select_option`).
+Each item in `selects` is rendered as a dropdown in the header. Use it for things like fan speed, cleaning mode (vacuum / mop / vacuum and mop), water level or mop intensity. Options are read live from the entity's `options` attribute and the icon comes from the entity itself, so any integration's options work. Picking an option calls `select.select_option` (or `input_select.select_option`).
+
+An item pointing at a `vacuum` entity is the fan speed dropdown: its options come from the vacuum's `fan_speed_list`, it defaults to the `mdi:fan` icon, and picking one calls `vacuum.set_fan_speed`.
 
 An item is either an entity_id or an object:
 
-| Name      |   Type   | Default      | Description                                                   |
-| --------- | :------: | ------------ | ------------------------------------------------------------- |
-| `entity`  | `string` | **Required** | A `select` / `input_select` entity_id.                        |
-| `name`    | `string` | Entity name  | Tooltip and accessible label of the dropdown.                 |
-| `icon`    | `string` | Entity icon  | Icon shown on the dropdown button.                            |
-| `options` | `array`  | All options  | Only show these options (values from the entity's `options`). |
+| Name      |   Type   | Default      | Description                                                                   |
+| --------- | :------: | ------------ | ----------------------------------------------------------------------------- |
+| `entity`  | `string` | **Required** | A `select` / `input_select` entity_id, or a `vacuum` entity_id for fan speed. |
+| `name`    | `string` | Entity name  | Tooltip and accessible label of the dropdown.                                 |
+| `icon`    | `string` | Entity icon  | Icon shown on the dropdown button.                                            |
+| `options` | `array`  | All options  | Only show these options (values from the entity's `options`).                 |
 
 ```yaml
 type: custom:vacuum-card
 entity: vacuum.robot
 selects:
+  - entity: vacuum.robot
+    options:
+      - quiet
+      - turbo
   - entity: select.robot_mode
     icon: mdi:robot-vacuum
     options:
@@ -159,7 +165,7 @@ selects:
   - select.robot_water
 ```
 
-- Leave `selects` out to use auto-detected selects (Valetudo only, see below).
+- Leave `selects` out to use the auto-detected dropdowns: fan speed (if the vacuum has fan speeds) plus Valetudo's mode and water selects (see below). The visual editor writes them into `selects` so you can edit or remove them.
 - List only the entities you want to show; anything not listed is hidden.
 - `selects: []` hides all select dropdowns.
 - A select whose entity doesn't exist or has no options is not shown.
@@ -178,7 +184,7 @@ The card then uses these entities from the same device, if the robot has them:
 | Valetudo entity                                 | Used for                                                              | Override with    |
 | ----------------------------------------------- | --------------------------------------------------------------------- | ---------------- |
 | `sensor.*_battery_level`                        | Battery level and icon                                                | `battery_entity` |
-| `select.*_mode`, `select.*_water`               | Mode and water dropdowns next to fan speed                            | `selects`        |
+| `select.*_mode`, `select.*_water`               | Mode and water dropdowns                                              | `selects`        |
 | `sensor.*_error`, `sensor.*_status_flag`        | More detailed status (e.g. _Segment cleaning_, the actual error text) | —                |
 | Consumable sensors (`mdi:progress-wrench`)      | Default stats (hours / % remaining)                                   | `stats`          |
 | `sensor.*_current_statistics_time` / `..._area` | Stats while cleaning (minutes, m²)                                    | `stats`          |
