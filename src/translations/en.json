@@ -114,7 +114,8 @@
     "action_stop": "Stop",
     "action_locate": "Locate",
     "action_return_to_base": "Dock",
-    "item_count": "{count} items"
+    "item_count": "{count} items",
+    "fan_speed": "Fan speed"
   },
   "mode": {
     "vacuum": "Vacuum",

@@ -23,6 +23,7 @@ import {
 } from './types';
 import {
   findValetudoEntities,
+  getDefaultSelects,
   getValetudoDefaults,
   normalizeSelect,
 } from './valetudo';
@@ -64,7 +65,7 @@ const UI_ACTION_SELECTOR = {
     default_action: 'perform-action',
   },
 };
-const SELECT_DOMAINS = ['select', 'input_select'];
+const SELECT_DOMAINS = ['select', 'input_select', 'vacuum'];
 const STAT_STATES = ['default', 'cleaning'];
 
 interface UiActionForm {
@@ -264,11 +265,13 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
       entity,
       valetudo: this.config?.valetudo ?? true,
     });
+    const selects = getDefaultSelects(this.hass, entity, valetudo);
     return {
       ...getValetudoDefaults(this.hass, valetudo, {
         cleaningTime: localize('stats.cleaning_time') ?? 'Cleaning time',
         cleanedArea: localize('stats.cleaned_area') ?? 'Cleaned area',
       }),
+      ...(selects.length ? { selects } : {}),
       actions: defaultActions(entity),
     };
   }
@@ -726,9 +729,28 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     });
   }
 
+  private selectOptions(entity: string): { value: string; label: string }[] {
+    const stateObj = this.hass?.states[entity];
+    if (entity.startsWith('vacuum.')) {
+      const speeds = stateObj?.attributes.fan_speed_list;
+      return (Array.isArray(speeds) ? (speeds as string[]) : []).map(
+        (value) => ({
+          value,
+          label: localize(`source.${value.toLowerCase()}`) ?? value,
+        }),
+      );
+    }
+    return (
+      (stateObj as SelectEntity | undefined)?.attributes.options ?? []
+    ).map((value) => ({
+      value,
+      label:
+        (stateObj && this.hass?.formatEntityState?.(stateObj, value)) || value,
+    }));
+  }
+
   private selectSchema({ entity }: VacuumCardSelect): ItemSchema[] {
-    const stateObj = this.hass?.states[entity] as SelectEntity | undefined;
-    const options = stateObj?.attributes.options ?? [];
+    const stateObj = this.hass?.states[entity];
     return [
       {
         name: 'entity',
@@ -738,7 +760,13 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
       { name: 'name', selector: { text: {} } },
       {
         name: 'icon',
-        selector: { icon: { placeholder: stateObj?.attributes.icon } },
+        selector: {
+          icon: {
+            placeholder: entity.startsWith('vacuum.')
+              ? 'mdi:fan'
+              : stateObj?.attributes.icon,
+          },
+        },
       },
       {
         name: 'options',
@@ -746,12 +774,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
           select: {
             multiple: true,
             mode: 'list',
-            options: options.map((value) => ({
-              value,
-              label:
-                (stateObj && this.hass?.formatEntityState?.(stateObj, value)) ||
-                value,
-            })),
+            options: this.selectOptions(entity),
           },
         },
       },
@@ -770,7 +793,11 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
         <div class="items">
           ${items.map((item, index) =>
             this.renderItem(
-              item.name || (this.entityName(item.entity) ?? item.entity),
+              item.name ||
+                (item.entity.startsWith('vacuum.')
+                  ? localize('editor.fan_speed')
+                  : this.entityName(item.entity)) ||
+                item.entity,
               item.entity,
               this.selectSchema(item),
               { ...item },

@@ -31,7 +31,7 @@ import {
 import {
   ValetudoEntities,
   findValetudoEntities,
-  getValetudoSelects,
+  getDefaultSelects,
   getValetudoStats,
   normalizeSelect,
 } from './valetudo';
@@ -139,9 +139,10 @@ export class VacuumCard extends LitElement {
   }
 
   get selectItems(): VacuumCardSelect[] {
-    return (this.config.selects ?? getValetudoSelects(this.valetudo)).map(
-      normalizeSelect,
-    );
+    return (
+      this.config.selects ??
+      getDefaultSelects(this.hass, this.config.entity, this.valetudo)
+    ).map(normalizeSelect);
   }
 
   get stats(): Record<string, VacuumCardStat[]> {
@@ -299,16 +300,18 @@ export class VacuumCard extends LitElement {
     }
   }
 
-  private handleSpeed(e: CustomEvent<{ item?: { value?: string } }>): void {
-    this.callVacuumService(
-      'set_fan_speed',
-      {
-        request: false,
-      },
-      {
-        fan_speed: e.detail.item?.value,
-      },
-    );
+  private handleFanSpeed(entityId: string, fanSpeed?: string): void {
+    if (
+      !fanSpeed ||
+      this.hass.states[entityId]?.attributes.fan_speed === fanSpeed
+    ) {
+      return;
+    }
+
+    this.hass.callService('vacuum', 'set_fan_speed', {
+      entity_id: entityId,
+      fan_speed: fanSpeed,
+    });
   }
 
   private handleSelectOption(entityId: string, option?: string): void {
@@ -391,12 +394,40 @@ export class VacuumCard extends LitElement {
     );
   }
 
-  private renderSelect({
+  private renderFanSpeed({
     entity: entityId,
     name,
     icon,
     options: shown,
   }: VacuumCardSelect): Template {
+    const stateObj = this.hass.states[entityId] as VacuumEntity | undefined;
+    const { fan_speed: value, fan_speed_list: speeds } =
+      stateObj?.attributes ?? {};
+    const options = Array.isArray(speeds)
+      ? speeds.filter((speed) => !shown?.length || shown.includes(speed))
+      : [];
+
+    if (!value || options.length === 0) {
+      return nothing;
+    }
+
+    return this.renderDropdown({
+      icon: icon ?? 'mdi:fan',
+      value,
+      options,
+      onSelect: (e) => this.handleFanSpeed(entityId, e.detail.item?.value),
+      formatLabel: (speed: string) =>
+        localize(`source.${speed.toLowerCase()}`) ?? speed,
+      ariaLabel: name ?? localize('editor.fan_speed') ?? 'Fan speed',
+    });
+  }
+
+  private renderSelect(item: VacuumCardSelect): Template {
+    if (item.entity.startsWith('vacuum.')) {
+      return this.renderFanSpeed(item);
+    }
+
+    const { entity: entityId, name, icon, options: shown } = item;
     const stateObj = this.hass.states[entityId] as SelectEntity | undefined;
     const options = stateObj?.attributes.options?.filter(
       (option) => !shown?.length || shown.includes(option),
@@ -454,26 +485,6 @@ export class VacuumCard extends LitElement {
       ...entity.attributes,
       status: status ?? state ?? entity.state,
     };
-  }
-
-  private renderSource(): Template {
-    const { fan_speed: source, fan_speed_list: sources } = this.getAttributes(
-      this.entity,
-    );
-
-    if (!Array.isArray(sources) || sources.length === 0 || !source) {
-      return nothing;
-    }
-
-    return this.renderDropdown({
-      icon: 'mdi:fan',
-      value: source,
-      options: sources,
-      onSelect: this.handleSpeed,
-      formatLabel: (value: string) =>
-        localize(`source.${value.toLowerCase()}`) ?? value,
-      ariaLabel: localize('source.fan_speed') || 'Fan speed',
-    });
   }
 
   private getBatteryDisplay(): {
@@ -835,8 +846,7 @@ export class VacuumCard extends LitElement {
         <div class="preview">
           <div class="header">
             <div class="tips">
-              ${this.renderSource()} ${this.renderSelects()}
-              ${this.renderBattery()}
+              ${this.renderSelects()} ${this.renderBattery()}
             </div>
             <ha-icon-button
               class="more-info"
