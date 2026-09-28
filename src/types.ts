@@ -62,18 +62,22 @@ export interface VacuumCardShortcut {
   target?: HassServiceTarget;
 }
 
+export interface ValetudoConfig {
+  topic_prefix?: string;
+  identifier?: string;
+}
+
 export interface VacuumCardConfig {
   entity: string;
   battery_entity: string;
   selects?: string[];
-  valetudo: boolean;
+  valetudo: ValetudoConfig | boolean;
   map: string;
   map_refresh: number;
   image: string;
   show_name: boolean;
   show_status: boolean;
   show_toolbar: boolean;
-  show_rooms: boolean;
   compact_view: boolean;
   stats: Record<string, VacuumCardStat[]>;
   actions: Record<string, VacuumCardAction>;
@@ -115,12 +119,6 @@ export interface VacuumEntityRegistryEntry {
       area_mapping?: Record<string, string[]>;
     };
   };
-}
-
-export interface VacuumRoom {
-  id: string;
-  name: string;
-  icon: string;
 }
 
 export interface ExtendedHomeAssistant extends HomeAssistant {

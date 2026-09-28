@@ -112,24 +112,23 @@ shortcuts:
 
 Here is what every option means:
 
-| Name             |   Type    | Default      | Description                                                                                               |
-| ---------------- | :-------: | ------------ | --------------------------------------------------------------------------------------------------------- |
-| `type`           | `string`  | **Required** | `custom:vacuum-card`                                                                                      |
-| `entity`         | `string`  | **Required** | An entity_id within the `vacuum` domain.                                                                  |
-| `battery_entity` | `string`  | Optional     | An entity_id within the `sensor` domain to display battery state and icon.                                |
-| `selects`        |  `array`  | Optional     | `select` / `input_select` entity_ids shown as dropdowns next to fan speed (e.g. cleaning mode, water).    |
-| `map`            | `string`  | Optional     | An entity_id within the `camera` or `image` domain, for streaming live vacuum map.                        |
-| `map_refresh`    | `integer` | `5`          | Update interval for map camera in seconds                                                                 |
-| `image`          | `string`  | `default`    | Path to image of your vacuum cleaner. Better to have `png` or `svg`.                                      |
-| `show_name`      | `boolean` | `true`       | Show friendly name of the vacuum.                                                                         |
-| `show_status`    | `boolean` | `true`       | Show status of the vacuum.                                                                                |
-| `show_toolbar`   | `boolean` | `true`       | Show toolbar with actions.                                                                                |
-| `compact_view`   | `boolean` | `false`      | Compact view without image.                                                                               |
-| `stats`          | `object`  | Optional     | Custom per state stats for your vacuum cleaner                                                            |
-| `actions`        | `object`  | Optional     | Override default actions behavior with service invocations.                                               |
-| `shortcuts`      |  `array`  | Optional     | List of shortcuts shown at the right bottom part of the card with custom actions for your vacuum cleaner. |
-| `show_rooms`     | `boolean` | `false`      | Show room chips from the vacuum's segment-to-area mapping. See [Rooms](#rooms).                           |
-| `valetudo`       | `boolean` | `true`       | Valetudo auto-detection. Set `false` to disable.                                                          |
+| Name             |         Type         | Default      | Description                                                                                               |
+| ---------------- | :------------------: | ------------ | --------------------------------------------------------------------------------------------------------- |
+| `type`           |       `string`       | **Required** | `custom:vacuum-card`                                                                                      |
+| `entity`         |       `string`       | **Required** | An entity_id within the `vacuum` domain.                                                                  |
+| `battery_entity` |       `string`       | Optional     | An entity_id within the `sensor` domain to display battery state and icon.                                |
+| `selects`        |       `array`        | Optional     | `select` / `input_select` entity_ids shown as dropdowns next to fan speed (e.g. cleaning mode, water).    |
+| `map`            |       `string`       | Optional     | An entity_id within the `camera` or `image` domain, for streaming live vacuum map.                        |
+| `map_refresh`    |      `integer`       | `5`          | Update interval for map camera in seconds                                                                 |
+| `image`          |       `string`       | `default`    | Path to image of your vacuum cleaner. Better to have `png` or `svg`.                                      |
+| `show_name`      |      `boolean`       | `true`       | Show friendly name of the vacuum.                                                                         |
+| `show_status`    |      `boolean`       | `true`       | Show status of the vacuum.                                                                                |
+| `show_toolbar`   |      `boolean`       | `true`       | Show toolbar with actions.                                                                                |
+| `compact_view`   |      `boolean`       | `false`      | Compact view without image.                                                                               |
+| `stats`          |       `object`       | Optional     | Custom per state stats for your vacuum cleaner                                                            |
+| `actions`        |       `object`       | Optional     | Override default actions behavior with service invocations.                                               |
+| `shortcuts`      |       `array`        | Optional     | List of shortcuts shown at the right bottom part of the card with custom actions for your vacuum cleaner. |
+| `valetudo`       | `boolean` / `object` | `true`       | Valetudo auto-detection. Set `false` to disable, or an object with `topic_prefix`, `identifier`.          |
 
 ### Select entities
 
@@ -166,22 +165,43 @@ The card then uses these entities from the same device, if the robot has them:
 | `sensor.*_error`, `sensor.*_status_flag`        | More detailed status (e.g. _Segment cleaning_, the actual error text) | —                |
 | Consumable sensors (`mdi:progress-wrench`)      | Default stats (hours / % remaining)                                   | `stats`          |
 | `sensor.*_current_statistics_time` / `..._area` | Stats while cleaning (minutes, m²)                                    | `stats`          |
+| `sensor.*_map_segments`                         | Rooms for the [room shortcuts](#room-shortcuts) button in the editor  | —                |
 
 Anything you configure explicitly takes precedence. The visual editor pre-fills the detected selects, so you can remove the ones you don't want.
 
-Set `valetudo: false` to turn off auto-detection completely.
-
-### Rooms
-
-With `show_rooms: true` (the _Show Rooms_ checkbox in the editor) the card shows a chip for every Home Assistant area mapped to the vacuum's segments, using the area's name and icon. Select one or more rooms and press start to clean them; the card calls `vacuum.clean_area` with the selected areas, and Home Assistant sends the matching segment IDs to the vacuum.
+Change `valetudo` settings only if the defaults don't fit:
 
 ```yaml
 type: custom:vacuum-card
 entity: vacuum.valetudo_robot
-show_rooms: true
+valetudo:
+  topic_prefix: valetudo # only if changed in Valetudo's MQTT settings
+  identifier: ShinyCoolRobot # only if it can't be read from the HA device
 ```
 
-This needs a vacuum that supports cleaning by area (for Valetudo, MQTT autodiscovery exposes this automatically when the robot supports segment cleaning) and a segment-to-area mapping configured in the vacuum's entity settings in Home Assistant. If the mapping is missing, the card shows an error instead of the room chips.
+| Name           |   Type   | Default                     | Description                                                |
+| -------------- | :------: | --------------------------- | ---------------------------------------------------------- |
+| `topic_prefix` | `string` | `valetudo`                  | MQTT topic prefix configured in Valetudo.                  |
+| `identifier`   | `string` | From the HA device registry | Valetudo MQTT identifier (Valetudo → Connectivity → MQTT). |
+
+Set `valetudo: false` to turn off auto-detection completely.
+
+#### Room shortcuts
+
+For a Valetudo vacuum with a `sensor.*_map_segments` sensor, the visual editor shows a **Generate Room Shortcuts** button. It adds one [shortcut](#shortcuts-object) per room, named after the room in Valetudo and using the icon of the Home Assistant area the room is mapped to. Map the vacuum's segments to areas in its entity settings first; if any room isn't mapped, the editor shows an error and adds nothing. Existing shortcuts that publish to the same room-cleaning topic (e.g. ones generated earlier or written by hand) are replaced; all other shortcuts are kept.
+
+Each generated shortcut looks like this:
+
+```yaml
+shortcuts:
+  - name: Clean Living Room
+    service: mqtt.publish
+    service_data:
+      topic: valetudo/ShinyCoolRobot/MapSegmentationCapability/clean/set
+      payload: >-
+        {"action":"start_segment_action","segment_ids":["7"],"iterations":1,"customOrder":true}
+    icon: mdi:sofa
+```
 
 ### `stats` object
 

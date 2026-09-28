@@ -1,3 +1,15 @@
+.room-shortcuts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+
+  .help {
+    color: var(--secondary-text-color);
+    font-size: 12px;
+  }
+}
+
 .card-config {
   flex-direction: column;
   display: flex;
