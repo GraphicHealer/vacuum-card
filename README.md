@@ -62,7 +62,9 @@ For a Valetudo vacuum, the editor writes everything it detects (battery sensor, 
 
 Shortcuts use Home Assistant's action picker: choose an action (e.g. `mqtt.publish`) and its fields and target are shown for you to fill in. It is saved in the same `action` / `data` / `target` format as automations.
 
-The collapsible **Toolbar Actions** section sets what the main buttons (start, pause, resume, stop, locate, return to base) do. The editor fills each one with its standard vacuum action (e.g. `vacuum.start` targeting your vacuum), so you can change it with the same action picker. A button whose action is cleared falls back to the standard vacuum action.
+The collapsible **Toolbar Actions** section sets what the main buttons (clean / continue, pause, stop, locate, return to base) do and when they show. The editor fills each one with its standard vacuum action (e.g. `vacuum.start` targeting your vacuum) and the vacuum statuses it normally shows for, so you can change both. A button whose action is cleared falls back to the standard vacuum action.
+
+Toolbar actions, sensors and shortcuts each have a **Show when status is** checklist (`states` in YAML) with the vacuum statuses `cleaning`, `docked`, `idle`, `paused`, `returning` and `error`.
 
 Typical example of using this card in YAML config would look like this:
 
@@ -81,23 +83,17 @@ actions:
       entity_id: vacuum.vacuum_cleaner
       segments: [16, 20]
 stats:
-  default:
-    - attribute: filter_left
-      unit: hours
-      subtitle: Filter
-    - attribute: side_brush_left
-      unit: hours
-      subtitle: Side brush
-    - attribute: main_brush_left
-      unit: hours
-      subtitle: Main brush
-    - attribute: sensor_dirty_left
-      unit: hours
-      subtitle: Sensors
-  cleaning:
-    - entity_id: sensor.vacuum_main_brush_left
-      value_template: '{{ (value | float(0) / 3600) | round(1) }}'
-      subtitle: Main brush
+  - attribute: filter_left
+    unit: hours
+    subtitle: Filter
+  - attribute: side_brush_left
+    unit: hours
+    subtitle: Side brush
+  - entity_id: sensor.vacuum_main_brush_left
+    value_template: '{{ (value | float(0) / 3600) | round(1) }}'
+    subtitle: Main brush
+    states:
+      - cleaning
       unit: hours
     - attribute: cleaning_time
       unit: minutes
@@ -129,8 +125,8 @@ Here is what every option means:
 | `show_status`    | `boolean` | `true`       | Show status of the vacuum.                                                                                |
 | `show_toolbar`   | `boolean` | `true`       | Show toolbar with actions.                                                                                |
 | `compact_view`   | `boolean` | `false`      | Compact view without image.                                                                               |
-| `stats`          | `object`  | Optional     | Custom per state stats for your vacuum cleaner                                                            |
-| `actions`        | `object`  | Optional     | Override default actions behavior with service invocations.                                               |
+| `stats`          |  `array`  | Optional     | Stats (sensors) for your vacuum cleaner, each optionally limited to some vacuum statuses.                 |
+| `actions`        | `object`  | Optional     | Override what the toolbar buttons do and when they show.                                                  |
 | `shortcuts`      |  `array`  | Optional     | List of shortcuts shown at the right bottom part of the card with custom actions for your vacuum cleaner. |
 | `valetudo`       | `boolean` | `true`       | Valetudo auto-detection. Set `false` to disable.                                                          |
 
@@ -186,10 +182,10 @@ The card then uses these entities from the same device, if the robot has them:
 | `sensor.*_battery_level`                        | Battery level and icon                                                | `battery_entity` |
 | `select.*_mode`, `select.*_water`               | Mode and water dropdowns                                              | `selects`        |
 | `sensor.*_error`, `sensor.*_status_flag`        | More detailed status (e.g. _Segment cleaning_, the actual error text) | —                |
-| Consumable sensors (`mdi:progress-wrench`)      | Default stats (hours / % remaining)                                   | `stats`          |
-| `sensor.*_current_statistics_time` / `..._area` | Stats while cleaning (minutes, m²)                                    | `stats`          |
+| Consumable sensors (`mdi:progress-wrench`)      | Sensors while not cleaning (hours / % remaining)                      | `stats`          |
+| `sensor.*_current_statistics_time` / `..._area` | Sensors while cleaning (minutes, m²)                                  | `stats`          |
 
-Anything you configure explicitly takes precedence. The visual editor writes the detected `battery_entity`, `selects` and `stats` into the card config, so you can change icons, names and options or remove items. Use `selects: []` or `stats: {}` to show none; if a key is left out entirely, the card falls back to auto-detection.
+Anything you configure explicitly takes precedence. The visual editor writes the detected `battery_entity`, `selects` and `stats` into the card config, so you can change icons, names and options or remove items. Use `selects: []` or `stats: []` to show none; if a key is left out entirely, the card falls back to auto-detection.
 
 Set `valetudo: false` to turn off auto-detection completely.
 
@@ -215,9 +211,9 @@ shortcuts:
         - living_room
 ```
 
-### `stats` object
+### `stats` array
 
-You can use any attribute of vacuum or even any entity by `entity_id` to display by stats section. You can also combine `attribute` with `entity_id` to extract an attribute value of specific entity. Stats are grouped by vacuum state (e.g. `cleaning`); `default` is used for any state without its own list. In the visual editor these are the **Sensors** lists.
+You can use any attribute of vacuum or even any entity by `entity_id` to display by stats section. You can also combine `attribute` with `entity_id` to extract an attribute value of specific entity. Use `states` to show a stat only for some vacuum statuses; without it the stat is always shown. In the visual editor this is the **Sensors** list.
 
 | Name             |   Type   | Default  | Description                                                                                          |
 | ---------------- | :------: | -------- | ---------------------------------------------------------------------------------------------------- |
@@ -227,10 +223,11 @@ You can use any attribute of vacuum or even any entity by `entity_id` to display
 | `unit`           | `string` | Optional | Unit of measure, i.e. `hours`.                                                                       |
 | `subtitle`       | `string` | Optional | Friendly name of the stat, i.e. `Filter`.                                                            |
 | `icon`           | `string` | Optional | Icon shown above the value, i.e. `mdi:air-filter`.                                                   |
+| `states`         | `array`  | Optional | Vacuum statuses to show the stat for, i.e. `[cleaning]`. Always shown if omitted.                    |
 
 ### `actions` object
 
-You can define action calls to override default actions behavior. Available actions to override are `start`, `pause`, `resume`, `stop`, `locate` and `return_to_base`. They use the same `action` / `data` / `target` format as automations, and the visual editor pre-fills them with the standard vacuum actions:
+You can define action calls to override default actions behavior. Available actions to override are `start` (also shown as Continue while paused or returning), `pause`, `stop`, `locate` and `return_to_base`. They use the same `action` / `data` / `target` format as automations, and the visual editor pre-fills them with the standard vacuum actions:
 
 ```yaml
 actions:
@@ -238,25 +235,30 @@ actions:
     action: vacuum.start
     target:
       entity_id: vacuum.robot
+    states:
+      - docked
+      - idle
 ```
 
-| Name     |   Type   | Default      | Description                                                    |
-| -------- | :------: | ------------ | -------------------------------------------------------------- |
-| `action` | `string` | **Required** | An action to call, i.e. `script.clean_bedroom`.                |
-| `data`   | `object` | Optional     | Data for the action call.                                      |
-| `target` | `object` | Optional     | A `HassServiceTarget`, to define a target for the action call. |
+| Name     |   Type   | Default  | Description                                                                                                                                                                                                                  |
+| -------- | :------: | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `action` | `string` | Optional | An action to call, i.e. `script.clean_bedroom`. Defaults to the standard vacuum action.                                                                                                                                      |
+| `states` | `array`  | Optional | Vacuum statuses to show the button for; `[]` hides it. Defaults: `start` docked/idle/paused/returning/error, `pause` cleaning/returning, `stop` cleaning, `locate` docked/idle/error, `return_to_base` cleaning/paused/idle. |
+| `data`   | `object` | Optional | Data for the action call.                                                                                                                                                                                                    |
+| `target` | `object` | Optional | A `HassServiceTarget`, to define a target for the action call.                                                                                                                                                               |
 
 ### `shortcuts` object
 
 You can defined [custom scripts][ha-scripts] for custom actions i.e cleaning specific room and add them to this card with `shortcuts` option.
 
-| Name     |   Type   | Default  | Description                                                    |
-| -------- | :------: | -------- | -------------------------------------------------------------- |
-| `name`   | `string` | Optional | Friendly name of the action, i.e. `Clean bedroom`.             |
-| `action` | `string` | Optional | An action to call, i.e. `script.clean_bedroom`.                |
-| `data`   | `object` | Optional | Data for the action call.                                      |
-| `target` | `object` | Optional | A `HassServiceTarget`, to define a target for the action call. |
-| `icon`   | `string` | Optional | Any icon for action button.                                    |
+| Name     |   Type   | Default  | Description                                                                   |
+| -------- | :------: | -------- | ----------------------------------------------------------------------------- |
+| `name`   | `string` | Optional | Friendly name of the action, i.e. `Clean bedroom`.                            |
+| `action` | `string` | Optional | An action to call, i.e. `script.clean_bedroom`.                               |
+| `data`   | `object` | Optional | Data for the action call.                                                     |
+| `target` | `object` | Optional | A `HassServiceTarget`, to define a target for the action call.                |
+| `icon`   | `string` | Optional | Any icon for action button.                                                   |
+| `states` | `array`  | Optional | Vacuum statuses to show the shortcut for. Defaults to docked, idle and error. |
 
 ## Theming
 

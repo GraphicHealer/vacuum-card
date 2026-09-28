@@ -4,6 +4,7 @@ import {
   VacuumCardSelect,
   VacuumCardStat,
 } from './types';
+import { VACUUM_STATES } from './config';
 
 export interface ValetudoEntities {
   vacuum: string;
@@ -160,7 +161,7 @@ export function getValetudoStats(
   hass: ExtendedHomeAssistant,
   valetudo: ValetudoEntities,
   labels: { cleaningTime: string; cleanedArea: string },
-): Record<string, VacuumCardStat[]> {
+): VacuumCardStat[] {
   const consumableStats = valetudo.consumables.map((entity_id) => {
     const isMinutes =
       hass.states[entity_id].attributes.unit_of_measurement === 'min';
@@ -181,6 +182,7 @@ export function getValetudoStats(
       value_template: '{{ (value | float(0) / 60) | round(0) | int }}',
       unit: 'min',
       subtitle: labels.cleaningTime,
+      states: ['cleaning'],
     });
   }
   if (valetudo.currentArea) {
@@ -189,17 +191,19 @@ export function getValetudoStats(
       value_template: '{{ (value | float(0) / 10000) | round(1) }}',
       unit: 'm²',
       subtitle: labels.cleanedArea,
+      states: ['cleaning'],
     });
   }
 
-  const stats: Record<string, VacuumCardStat[]> = {};
-  if (consumableStats.length) {
-    stats.default = consumableStats;
-  }
-  if (cleaningStats.length) {
-    stats.cleaning = cleaningStats;
-  }
-  return stats;
+  const notCleaning = cleaningStats.length
+    ? VACUUM_STATES.filter((state) => state !== 'cleaning')
+    : undefined;
+  return [
+    ...consumableStats.map((stat) =>
+      notCleaning ? { ...stat, states: notCleaning } : stat,
+    ),
+    ...cleaningStats,
+  ];
 }
 
 export function getValetudoDefaults(
@@ -220,7 +224,7 @@ export function getValetudoDefaults(
     defaults.battery_entity = valetudo.battery;
   }
   const stats = getValetudoStats(hass, valetudo, labels);
-  if (Object.keys(stats).length) {
+  if (stats.length) {
     defaults.stats = stats;
   }
   return defaults;

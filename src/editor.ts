@@ -18,6 +18,7 @@ import {
   VacuumCardSelect,
   VacuumCardShortcut,
   VacuumCardStat,
+  VacuumCardToolbarAction,
   VacuumEntityRegistryEntry,
   VacuumSegment,
 } from './types';
@@ -27,6 +28,7 @@ import {
   getValetudoDefaults,
   normalizeSelect,
 } from './valetudo';
+import { TOOLBAR_BUTTONS, VACUUM_STATES, normalizeStats } from './config';
 import styles from './editor.css';
 
 type EditorConfig = LovelaceCardConfig & Partial<VacuumCardConfig>;
@@ -40,6 +42,7 @@ interface FormSchema {
 interface ItemSchema {
   name: string;
   required?: boolean;
+  helper?: string;
   selector: Record<string, unknown>;
 }
 
@@ -51,14 +54,6 @@ const DETECTED_KEYS = [
   'stats',
   'actions',
 ] as const;
-const TOOLBAR_ACTIONS: Record<string, string> = {
-  start: 'start',
-  pause: 'pause',
-  resume: 'start',
-  stop: 'stop',
-  locate: 'locate',
-  return_to_base: 'return_to_base',
-};
 const UI_ACTION_SELECTOR = {
   ui_action: {
     actions: ['perform-action'],
@@ -66,7 +61,6 @@ const UI_ACTION_SELECTOR = {
   },
 };
 const SELECT_DOMAINS = ['select', 'input_select', 'vacuum'];
-const STAT_STATES = ['default', 'cleaning'];
 
 interface UiActionForm {
   action?: string;
@@ -79,6 +73,7 @@ interface ShortcutForm extends ItemValue {
   name?: string;
   icon?: string;
   tap_action?: UiActionForm;
+  states?: string[];
 }
 
 function actionToForm({
@@ -113,12 +108,14 @@ function actionFromForm(
 function shortcutToForm({
   name,
   icon,
+  states,
   ...action
 }: VacuumCardShortcut): ShortcutForm {
   return cleanItem<ShortcutForm>({
     name,
     icon,
     tap_action: actionToForm(action),
+    states,
   });
 }
 
@@ -126,19 +123,23 @@ function shortcutFromForm({
   name,
   icon,
   tap_action,
+  states,
 }: ShortcutForm): VacuumCardShortcut {
   return cleanItem<ItemValue>({
     name,
     icon,
     ...actionFromForm(tap_action),
+    states,
   }) as VacuumCardShortcut;
 }
 
-function defaultActions(entity: string): Record<string, VacuumCardAction> {
+function defaultActions(
+  entity: string,
+): Record<string, VacuumCardToolbarAction> {
   return Object.fromEntries(
-    Object.entries(TOOLBAR_ACTIONS).map(([key, service]) => [
+    Object.entries(TOOLBAR_BUTTONS).map(([key, { states }]) => [
       key,
-      { action: `vacuum.${service}`, target: { entity_id: entity } },
+      { action: `vacuum.${key}`, target: { entity_id: entity }, states },
     ]),
   );
 }
@@ -229,7 +230,15 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
   private filledEntity?: string;
 
   setConfig(config: EditorConfig): void {
-    this.config = { ...config };
+    const next: EditorConfig = { ...config };
+    if (next.stats && !Array.isArray(next.stats)) {
+      next.stats = normalizeStats(next.stats);
+    }
+    if (next.actions && 'resume' in next.actions) {
+      next.actions = { ...next.actions };
+      delete next.actions.resume;
+    }
+    this.config = next;
   }
 
   public disconnectedCallback(): void {
@@ -524,14 +533,42 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     this.updateConfig({ ...this.config!, shortcuts });
   }
 
+  private statesSchema(helper?: string): ItemSchema {
+    return {
+      name: 'states',
+      helper,
+      selector: {
+        select: {
+          multiple: true,
+          mode: 'list',
+          options: VACUUM_STATES.map((value) => ({
+            value,
+            label: localize(`status.${value}`) ?? value,
+          })),
+        },
+      },
+    };
+  }
+
+  private setToolbarAction(
+    key: string,
+    { tap_action, states }: { tap_action?: UiActionForm; states?: string[] },
+  ): void {
+    this.updateConfig({
+      ...this.config!,
+      actions: {
+        ...(this.config!.actions ?? {}),
+        [key]: { ...actionFromForm(tap_action), states: states ?? [] },
+      },
+    });
+  }
+
   private renderToolbarActions(): Template {
     const actions = this.config?.actions ?? {};
-    const data = Object.fromEntries(
-      Object.entries(actions).map(([key, action]) => [
-        key,
-        actionToForm(action),
-      ]),
-    );
+    const schema = [
+      { name: 'tap_action', selector: UI_ACTION_SELECTOR },
+      this.statesSchema(localize('editor.states_toolbar')),
+    ];
 
     return html`
       <ha-expansion-panel
@@ -539,30 +576,38 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
         .header=${localize('editor.toolbar_actions')}
         .secondary=${localize('editor.toolbar_actions_help')}
       >
-        <div class="item">
-          <ha-form
-            .hass=${this.hass}
-            .data=${data}
-            .schema=${Object.keys(TOOLBAR_ACTIONS).map((name) => ({
-              name,
-              selector: UI_ACTION_SELECTOR,
-            }))}
-            .computeLabel=${({ name }: ItemSchema) =>
-              localize(`editor.action_${name}`) ?? name}
-            @value-changed=${(
-              event: CustomEvent<{ value: Record<string, UiActionForm> }>,
-            ) => {
-              event.stopPropagation();
-              const next: Record<string, VacuumCardAction> = {};
-              for (const [key, form] of Object.entries(event.detail.value)) {
-                const action = actionFromForm(form);
-                if (action?.action) {
-                  next[key] = action as VacuumCardAction;
-                }
-              }
-              this.updateConfig({ ...this.config!, actions: next });
-            }}
-          ></ha-form>
+        <div class="items">
+          ${Object.entries(TOOLBAR_BUTTONS).map(([key, { states }]) => {
+            const item = actions[key] ?? {};
+            return html`
+              <ha-expansion-panel
+                outlined
+                .header=${localize(`editor.action_${key}`) ?? key}
+                .secondary=${item.action ?? ''}
+              >
+                <div class="item">
+                  <ha-form
+                    .hass=${this.hass}
+                    .data=${cleanItem<ItemValue>({
+                      tap_action: actionToForm(item),
+                      states: item.states ?? states,
+                    })}
+                    .schema=${schema}
+                    .computeLabel=${this.computeItemLabel}
+                    .computeHelper=${this.computeItemHelper}
+                    @value-changed=${(
+                      event: CustomEvent<{
+                        value: { tap_action?: UiActionForm; states?: string[] };
+                      }>,
+                    ) => {
+                      event.stopPropagation();
+                      this.setToolbarAction(key, event.detail.value);
+                    }}
+                  ></ha-form>
+                </div>
+              </ha-expansion-panel>
+            `;
+          })}
         </div>
       </ha-expansion-panel>
     `;
@@ -574,6 +619,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
       { name: 'name', selector: { text: {} } },
       { name: 'icon', selector: { icon: {} } },
       { name: 'tap_action', selector: UI_ACTION_SELECTOR },
+      this.statesSchema(localize('editor.states_shortcut')),
     ];
 
     return html`
@@ -665,6 +711,9 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
   private computeItemLabel = ({ name }: ItemSchema): string =>
     localize(`editor.item_${name}`) ?? name;
 
+  private computeItemHelper = ({ helper }: ItemSchema): string | undefined =>
+    helper;
+
   private entityName(entityId?: string): string | undefined {
     return entityId
       ? String(
@@ -689,6 +738,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
             .data=${data}
             .schema=${schema}
             .computeLabel=${this.computeItemLabel}
+            .computeHelper=${this.computeItemHelper}
             @value-changed=${(event: CustomEvent<{ value: ItemValue }>) => {
               event.stopPropagation();
               onChange(cleanItem(event.detail.value));
@@ -843,13 +893,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     `;
   }
 
-  private setStats(state: string, list: VacuumCardStat[]): void {
-    const stats = { ...(this.config!.stats ?? {}) };
-    if (list.length) {
-      stats[state] = list;
-    } else {
-      delete stats[state];
-    }
+  private setStats(stats: VacuumCardStat[]): void {
     this.updateConfig({ ...this.config!, stats });
   }
 
@@ -871,23 +915,17 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
       },
       { name: 'unit', selector: { text: {} } },
       { name: 'value_template', selector: { template: {} } },
+      this.statesSchema(localize('editor.states_stat')),
     ];
   }
 
-  private renderStats(state: string, list: VacuumCardStat[]): Template {
-    const title =
-      state === 'default'
-        ? localize('editor.stats_default')
-        : localize(
-            'editor.stats_state',
-            '{state}',
-            localize(`status.${state}`) ?? state,
-          );
+  private renderStats(): Template {
+    const list = normalizeStats(this.config?.stats) ?? [];
 
     return html`
       <ha-expansion-panel
         outlined
-        .header=${title}
+        .header=${localize('editor.stats')}
         .secondary=${localize('editor.item_count', '{count}', String(list.length))}
       >
         <div class="items">
@@ -902,30 +940,17 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
               { ...stat },
               (value) =>
                 this.setStats(
-                  state,
                   list.map((old, i) => (i === index ? value : old)),
                 ),
-              () =>
-                this.setStats(
-                  state,
-                  list.filter((_, i) => i !== index),
-                ),
+              () => this.setStats(list.filter((_, i) => i !== index)),
             ),
           )}
-          ${this.renderAddEntity(`stats.${state}`, {}, (entity_id) =>
-            this.setStats(state, [...list, { entity_id }]),
+          ${this.renderAddEntity('stats', {}, (entity_id) =>
+            this.setStats([...list, { entity_id }]),
           )}
         </div>
       </ha-expansion-panel>
     `;
-  }
-
-  private renderAllStats(): Template {
-    const stats = this.config?.stats ?? {};
-    const states = [...new Set([...STAT_STATES, ...Object.keys(stats)])];
-    return html`${states.map((state) =>
-      this.renderStats(state, stats[state] ?? []),
-    )}`;
   }
 
   protected render(): Template {
@@ -945,8 +970,8 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
           .computeLabel=${this.computeLabel}
           @value-changed=${this.valueChanged}
         ></ha-form>
-        ${this.renderSelects()} ${this.renderAllStats()}
-        ${this.renderShortcuts()} ${this.renderToolbarActions()}
+        ${this.renderSelects()} ${this.renderStats()} ${this.renderShortcuts()}
+        ${this.renderToolbarActions()}
       </div>
     `;
   }
