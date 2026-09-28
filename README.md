@@ -60,7 +60,7 @@ This card can be configured using Lovelace UI editor.
 
 For a Valetudo vacuum, the editor writes everything it detects (battery sensor, header dropdowns and sensors) into the card config, so you can edit or remove any of it in the editor or in YAML.
 
-Shortcuts use Home Assistant's action picker: choose an action (e.g. `mqtt.publish`) and its fields and target are shown for you to fill in. It is saved as `service`, `service_data` and `target`.
+Shortcuts use Home Assistant's action picker: choose an action (e.g. `mqtt.publish`) and its fields and target are shown for you to fill in. It is saved in the same `action` / `data` / `target` format as automations.
 
 _Overriding the toolbar buttons with `actions` is only available in the code editor._
 
@@ -76,8 +76,8 @@ selects:
 map: camera.vacuum_cleaner_map
 actions:
   start:
-    service: xiaomi_miio.vacuum_clean_segment
-    service_data:
+    action: xiaomi_miio.vacuum_clean_segment
+    data:
       entity_id: vacuum.vacuum_cleaner
       segments: [16, 20]
 stats:
@@ -104,13 +104,13 @@ stats:
       subtitle: Cleaning time
 shortcuts:
   - name: Clean living room
-    service: script.clean_living_room
+    action: script.clean_living_room
     icon: 'mdi:sofa'
   - name: Clean bedroom
-    service: script.clean_bedroom
+    action: script.clean_bedroom
     icon: 'mdi:bed-empty'
   - name: Clean kitchen
-    service: script.clean_kitchen
+    action: script.clean_kitchen
     icon: 'mdi:silverware-fork-knife'
 ```
 
@@ -212,8 +212,8 @@ Each generated shortcut looks like this:
 ```yaml
 shortcuts:
   - name: Clean Living Room
-    service: mqtt.publish
-    service_data:
+    action: mqtt.publish
+    data:
       topic: valetudo/ShinyCoolRobot/MapSegmentationCapability/clean/set
       payload: >-
         {"action":"start_segment_action","segment_ids":["7"],"iterations":1,"customOrder":true}
@@ -235,24 +235,25 @@ You can use any attribute of vacuum or even any entity by `entity_id` to display
 
 ### `actions` object
 
-You can defined service invocations to override default actions behavior. Available actions to override are `start`, `pause`, `resume`, `stop`, `locate` and `return_to_base`.
+You can define action calls to override default actions behavior. Available actions to override are `start`, `pause`, `resume`, `stop`, `locate` and `return_to_base`. They use the same `action` / `data` / `target` format as automations.
 
-| Name           |   Type   | Default  | Description                                     |
-| -------------- | :------: | -------- | ----------------------------------------------- |
-| `service`      | `string` | Optional | A service to call, i.e. `script.clean_bedroom`. |
-| `service_data` | `object` | Optional | `service_data` for `service` call               |
+| Name     |   Type   | Default      | Description                                                    |
+| -------- | :------: | ------------ | -------------------------------------------------------------- |
+| `action` | `string` | **Required** | An action to call, i.e. `script.clean_bedroom`.                |
+| `data`   | `object` | Optional     | Data for the action call.                                      |
+| `target` | `object` | Optional     | A `HassServiceTarget`, to define a target for the action call. |
 
 ### `shortcuts` object
 
 You can defined [custom scripts][ha-scripts] for custom actions i.e cleaning specific room and add them to this card with `shortcuts` option.
 
-| Name           |   Type   | Default  | Description                                                             |
-| -------------- | :------: | -------- | ----------------------------------------------------------------------- |
-| `name`         | `string` | Optional | Friendly name of the action, i.e. `Clean bedroom`.                      |
-| `service`      | `string` | Optional | A service to call, i.e. `script.clean_bedroom`.                         |
-| `target`       | `object` | Optional | A `HassServiceTarget`, to define a target for the current service call. |
-| `icon`         | `string` | Optional | Any icon for action button.                                             |
-| `service_data` | `object` | Optional | `service_data` for `service` call                                       |
+| Name     |   Type   | Default  | Description                                                    |
+| -------- | :------: | -------- | -------------------------------------------------------------- |
+| `name`   | `string` | Optional | Friendly name of the action, i.e. `Clean bedroom`.             |
+| `action` | `string` | Optional | An action to call, i.e. `script.clean_bedroom`.                |
+| `data`   | `object` | Optional | Data for the action call.                                      |
+| `target` | `object` | Optional | A `HassServiceTarget`, to define a target for the action call. |
+| `icon`   | `string` | Optional | Any icon for action button.                                    |
 
 ## Theming
 

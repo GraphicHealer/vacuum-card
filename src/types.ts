@@ -57,16 +57,16 @@ export interface VacuumCardSelect {
 }
 
 export interface VacuumCardAction {
-  service: string;
-  service_data?: Record<string, unknown>;
+  action: string;
+  data?: Record<string, unknown>;
   target?: HassServiceTarget;
 }
 
 export interface VacuumCardShortcut {
   name?: string;
   icon?: string;
-  service?: string;
-  service_data?: Record<string, unknown>;
+  action?: string;
+  data?: Record<string, unknown>;
   target?: HassServiceTarget;
 }
 

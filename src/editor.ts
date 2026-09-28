@@ -62,18 +62,18 @@ interface ShortcutForm extends ItemValue {
 function shortcutToForm({
   name,
   icon,
-  service,
-  service_data,
+  action,
+  data,
   target,
 }: VacuumCardShortcut): ShortcutForm {
   return cleanItem<ShortcutForm>({
     name,
     icon,
-    tap_action: service
+    tap_action: action
       ? cleanItem({
           action: 'perform-action',
-          perform_action: service,
-          data: service_data,
+          perform_action: action,
+          data,
           target,
         })
       : undefined,
@@ -88,8 +88,8 @@ function shortcutFromForm({
   return cleanItem<ItemValue>({
     name,
     icon,
-    service: tap_action?.perform_action || undefined,
-    service_data:
+    action: tap_action?.perform_action || undefined,
+    data:
       tap_action?.data && Object.keys(tap_action.data).length
         ? tap_action.data
         : undefined,
@@ -101,13 +101,13 @@ function shortcutFromForm({
 }
 
 function roomSegment(
-  { service_data }: VacuumCardShortcut,
+  { data }: VacuumCardShortcut,
   topic: string,
 ): string | undefined {
-  if (service_data?.topic !== topic) {
+  if (data?.topic !== topic) {
     return undefined;
   }
-  let payload = service_data.payload;
+  let payload = data.payload;
   if (typeof payload === 'string') {
     try {
       payload = JSON.parse(payload);
@@ -428,8 +428,8 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
 
     const roomShortcuts: VacuumCardShortcut[] = rooms.map((room) => ({
       name: localize('editor.clean_room', '{room}', room.name) ?? room.name,
-      service: 'mqtt.publish',
-      service_data: {
+      action: 'mqtt.publish',
+      data: {
         topic,
         payload: JSON.stringify({
           action: 'start_segment_action',
@@ -527,8 +527,8 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
         <div class="items-title">${localize('editor.shortcuts')}</div>
         ${items.map((item, index) =>
           this.renderItem(
-            item.name || item.service || '',
-            item.service ?? '',
+            item.name || item.action || '',
+            item.action ?? '',
             schema,
             shortcutToForm(item),
             (value) =>
