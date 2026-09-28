@@ -55,6 +55,8 @@ Shortcuts use Home Assistant's action picker: choose an action (e.g. `mqtt.publi
 
 The collapsible **Toolbar Actions** section sets what the main buttons (clean / continue, pause, stop, locate, return to base) do and when they show. The editor fills each one with its standard vacuum action (e.g. `vacuum.start` targeting your vacuum) and the vacuum statuses it normally shows for, so you can change both. A button whose action is cleared falls back to the standard vacuum action.
 
+Drag the handle next to any sensor, header dropdown, shortcut or toolbar action to reorder it; the card shows them in the same order as the config.
+
 Toolbar actions, sensors and shortcuts each have a **Show when status is** checklist (`states` in YAML) with the vacuum statuses `cleaning`, `docked`, `idle`, `paused`, `returning` and `error`.
 
 Typical example of using this card in YAML config would look like this:

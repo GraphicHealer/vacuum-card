@@ -69,6 +69,29 @@
   }
 }
 
+.sortable {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sortable-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+
+  .handle {
+    cursor: grab;
+    color: var(--secondary-text-color);
+    padding: 12px 4px;
+  }
+
+  ha-expansion-panel {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
 .card-config {
   flex-direction: column;
   display: flex;

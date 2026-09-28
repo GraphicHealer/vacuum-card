@@ -28,7 +28,12 @@ import {
   getDetectedDefaults,
   normalizeSelect,
 } from './valetudo';
-import { TOOLBAR_BUTTONS, VACUUM_STATES, normalizeStats } from './config';
+import {
+  TOOLBAR_BUTTONS,
+  VACUUM_STATES,
+  normalizeStats,
+  toolbarOrder,
+} from './config';
 import styles from './editor.css';
 
 type EditorConfig = LovelaceCardConfig & Partial<VacuumCardConfig>;
@@ -61,6 +66,35 @@ const UI_ACTION_SELECTOR = {
   },
 };
 const SELECT_DOMAINS = ['select', 'input_select', 'vacuum'];
+
+interface CardHelpers {
+  createCardElement(config: LovelaceCardConfig): HTMLElement;
+}
+
+interface ConfigurableCard {
+  getConfigElement?: () => Promise<HTMLElement>;
+}
+
+declare global {
+  interface Window {
+    loadCardHelpers?: () => Promise<CardHelpers>;
+  }
+}
+
+async function loadSortable(): Promise<void> {
+  if (customElements.get('ha-sortable') || !window.loadCardHelpers) {
+    return;
+  }
+  const helpers = await window.loadCardHelpers();
+  const card = helpers.createCardElement({ type: 'entities', entities: [] });
+  await (card.constructor as ConfigurableCard).getConfigElement?.();
+}
+
+function moveItem<T>(list: T[], from: number, to: number): T[] {
+  const next = [...list];
+  next.splice(to, 0, ...next.splice(from, 1));
+  return next;
+}
 
 interface UiActionForm {
   action?: string;
@@ -239,6 +273,16 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
       delete next.actions.resume;
     }
     this.config = next;
+  }
+
+  public connectedCallback(): void {
+    super.connectedCallback();
+    if (!customElements.get('ha-sortable')) {
+      loadSortable().catch(() => undefined);
+      customElements
+        .whenDefined('ha-sortable')
+        .then(() => this.requestUpdate());
+    }
   }
 
   public disconnectedCallback(): void {
@@ -563,8 +607,49 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     });
   }
 
+  private moveToolbarAction(order: string[], from: number, to: number): void {
+    const actions = this.config!.actions ?? {};
+    this.updateConfig({
+      ...this.config!,
+      actions: Object.fromEntries(
+        moveItem(order, from, to).map((key) => [key, actions[key] ?? {}]),
+      ),
+    });
+  }
+
+  private renderSortable(
+    items: Template[],
+    onMove: (from: number, to: number) => void,
+  ): Template {
+    return html`
+      <ha-sortable
+        handle-selector=".handle"
+        @item-moved=${(
+          event: CustomEvent<{ oldIndex: number; newIndex: number }>,
+        ) => {
+          event.stopPropagation();
+          onMove(event.detail.oldIndex, event.detail.newIndex);
+        }}
+      >
+        <div class="sortable">${items}</div>
+      </ha-sortable>
+    `;
+  }
+
+  private renderSortableItem(content: Template): Template {
+    return html`
+      <div class="sortable-item">
+        <div class="handle">
+          <ha-icon icon="mdi:drag"></ha-icon>
+        </div>
+        ${content}
+      </div>
+    `;
+  }
+
   private renderToolbarActions(): Template {
     const actions = this.config?.actions ?? {};
+    const order = toolbarOrder(actions);
     const schema = [
       { name: 'tap_action', selector: UI_ACTION_SELECTOR },
       this.statesSchema(localize('editor.states_toolbar')),
@@ -577,37 +662,44 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
         .secondary=${localize('editor.toolbar_actions_help')}
       >
         <div class="items">
-          ${Object.entries(TOOLBAR_BUTTONS).map(([key, { states }]) => {
-            const item = actions[key] ?? {};
-            return html`
-              <ha-expansion-panel
-                outlined
-                .header=${localize(`editor.action_${key}`) ?? key}
-                .secondary=${item.action ?? ''}
-              >
-                <div class="item">
-                  <ha-form
-                    .hass=${this.hass}
-                    .data=${cleanItem<ItemValue>({
-                      tap_action: actionToForm(item),
-                      states: item.states ?? states,
-                    })}
-                    .schema=${schema}
-                    .computeLabel=${this.computeItemLabel}
-                    .computeHelper=${this.computeItemHelper}
-                    @value-changed=${(
-                      event: CustomEvent<{
-                        value: { tap_action?: UiActionForm; states?: string[] };
-                      }>,
-                    ) => {
-                      event.stopPropagation();
-                      this.setToolbarAction(key, event.detail.value);
-                    }}
-                  ></ha-form>
-                </div>
-              </ha-expansion-panel>
-            `;
-          })}
+          ${this.renderSortable(
+            order.map((key) => {
+              const item = actions[key] ?? {};
+              const { states } = TOOLBAR_BUTTONS[key];
+              return this.renderSortableItem(html`
+                <ha-expansion-panel
+                  outlined
+                  .header=${localize(`editor.action_${key}`) ?? key}
+                  .secondary=${item.action ?? ''}
+                >
+                  <div class="item">
+                    <ha-form
+                      .hass=${this.hass}
+                      .data=${cleanItem<ItemValue>({
+                        tap_action: actionToForm(item),
+                        states: item.states ?? states,
+                      })}
+                      .schema=${schema}
+                      .computeLabel=${this.computeItemLabel}
+                      .computeHelper=${this.computeItemHelper}
+                      @value-changed=${(
+                        event: CustomEvent<{
+                          value: {
+                            tap_action?: UiActionForm;
+                            states?: string[];
+                          };
+                        }>,
+                      ) => {
+                        event.stopPropagation();
+                        this.setToolbarAction(key, event.detail.value);
+                      }}
+                    ></ha-form>
+                  </div>
+                </ha-expansion-panel>
+              `);
+            }),
+            (from, to) => this.moveToolbarAction(order, from, to),
+          )}
         </div>
       </ha-expansion-panel>
     `;
@@ -629,20 +721,25 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
         .secondary=${localize('editor.item_count', '{count}', String(items.length))}
       >
         <div class="items">
-          ${items.map((item, index) =>
-            this.renderItem(
-              item.name || item.action || '',
-              item.action ?? '',
-              schema,
-              shortcutToForm(item),
-              (value) =>
-                this.setShortcuts(
-                  items.map((old, i) =>
-                    i === index ? shortcutFromForm(value as ShortcutForm) : old,
+          ${this.renderSortable(
+            items.map((item, index) =>
+              this.renderItem(
+                item.name || item.action || '',
+                item.action ?? '',
+                schema,
+                shortcutToForm(item),
+                (value) =>
+                  this.setShortcuts(
+                    items.map((old, i) =>
+                      i === index
+                        ? shortcutFromForm(value as ShortcutForm)
+                        : old,
+                    ),
                   ),
-                ),
-              () => this.setShortcuts(items.filter((_, i) => i !== index)),
+                () => this.setShortcuts(items.filter((_, i) => i !== index)),
+              ),
             ),
+            (from, to) => this.setShortcuts(moveItem(items, from, to)),
           )}
           <ha-button
             appearance="plain"
@@ -730,7 +827,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     onChange: (value: ItemValue) => void,
     onRemove: () => void,
   ): Template {
-    return html`
+    return this.renderSortableItem(html`
       <ha-expansion-panel outlined .header=${header} .secondary=${secondary}>
         <div class="item">
           <ha-form
@@ -749,7 +846,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
           </ha-button>
         </div>
       </ha-expansion-panel>
-    `;
+    `);
   }
 
   private renderAddEntity(
@@ -864,24 +961,29 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
         .secondary=${localize('editor.item_count', '{count}', String(items.length))}
       >
         <div class="items">
-          ${items.map((item, index) =>
-            this.renderItem(
-              item.name ||
-                (item.entity.startsWith('vacuum.')
-                  ? localize('editor.fan_speed')
-                  : this.entityName(item.entity)) ||
+          ${this.renderSortable(
+            items.map((item, index) =>
+              this.renderItem(
+                item.name ||
+                  (item.entity.startsWith('vacuum.')
+                    ? localize('editor.fan_speed')
+                    : this.entityName(item.entity)) ||
+                  item.entity,
                 item.entity,
-              item.entity,
-              this.selectSchema(item),
-              { ...item },
-              (value) =>
-                this.setSelects(
-                  items.map((old, i) =>
-                    i === index ? (value as unknown as VacuumCardSelect) : old,
+                this.selectSchema(item),
+                { ...item },
+                (value) =>
+                  this.setSelects(
+                    items.map((old, i) =>
+                      i === index
+                        ? (value as unknown as VacuumCardSelect)
+                        : old,
+                    ),
                   ),
-                ),
-              () => this.setSelects(items.filter((_, i) => i !== index)),
+                () => this.setSelects(items.filter((_, i) => i !== index)),
+              ),
             ),
+            (from, to) => this.setSelects(moveItem(items, from, to)),
           )}
           ${this.renderAddEntity(
             'selects',
@@ -929,21 +1031,24 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
         .secondary=${localize('editor.item_count', '{count}', String(list.length))}
       >
         <div class="items">
-          ${list.map((stat, index) =>
-            this.renderItem(
-              stat.subtitle ||
-                this.entityName(stat.entity_id) ||
-                stat.attribute ||
-                '',
-              [stat.entity_id, stat.attribute].filter(Boolean).join(' · '),
-              this.statSchema(stat),
-              { ...stat },
-              (value) =>
-                this.setStats(
-                  list.map((old, i) => (i === index ? value : old)),
-                ),
-              () => this.setStats(list.filter((_, i) => i !== index)),
+          ${this.renderSortable(
+            list.map((stat, index) =>
+              this.renderItem(
+                stat.subtitle ||
+                  this.entityName(stat.entity_id) ||
+                  stat.attribute ||
+                  '',
+                [stat.entity_id, stat.attribute].filter(Boolean).join(' · '),
+                this.statSchema(stat),
+                { ...stat },
+                (value) =>
+                  this.setStats(
+                    list.map((old, i) => (i === index ? value : old)),
+                  ),
+                () => this.setStats(list.filter((_, i) => i !== index)),
+              ),
             ),
+            (from, to) => this.setStats(moveItem(list, from, to)),
           )}
           ${this.renderAddEntity('stats', {}, (entity_id) =>
             this.setStats([...list, { entity_id }]),

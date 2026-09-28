@@ -15,6 +15,7 @@ import styles from './styles.css';
 import buildConfig, {
   SHORTCUT_STATES,
   TOOLBAR_BUTTONS,
+  toolbarOrder,
   isShownIn,
   vacuumStateGroup,
 } from './config';
@@ -700,7 +701,8 @@ export class VacuumCard extends LitElement {
 
     const group = vacuumStateGroup(state);
     const active = ['cleaning', 'paused', 'returning'].includes(group);
-    const buttons = Object.entries(TOOLBAR_BUTTONS)
+    const buttons = toolbarOrder(this.config.actions)
+      .map((key) => [key, TOOLBAR_BUTTONS[key]] as const)
       .filter(([key, { states }]) =>
         isShownIn(state, this.config.actions[key]?.states, states),
       )
