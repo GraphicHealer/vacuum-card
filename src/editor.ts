@@ -55,6 +55,7 @@ const SCHEMA: FormSchema[] = [
   { name: 'show_name', selector: { boolean: {} } },
   { name: 'show_status', selector: { boolean: {} } },
   { name: 'show_toolbar', selector: { boolean: {} } },
+  { name: 'show_rooms', selector: { boolean: {} } },
 ];
 
 const DEFAULTS: Partial<VacuumCardConfig> = {
@@ -62,6 +63,7 @@ const DEFAULTS: Partial<VacuumCardConfig> = {
   show_name: true,
   show_status: true,
   show_toolbar: true,
+  show_rooms: false,
   map_refresh: 5,
 };
 

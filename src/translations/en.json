@@ -58,7 +58,9 @@
   },
   "error": {
     "invalid_config": "Invalid configuration",
-    "missing_entity": "Specifying entity is required!"
+    "missing_entity": "Specifying entity is required!",
+    "rooms_not_mapped": "Rooms are not mapped to areas. Map this vacuum's segments to areas in its entity settings in Home Assistant.",
+    "clean_area_unsupported": "This vacuum does not support cleaning by area."
   },
   "warning": {
     "actions_array": "WARNING: 'actions' is reserved to override default actions for existing buttons. If your intention was to add additional actions, use the 'shortcuts' option instead."
@@ -74,7 +76,8 @@
     "show_toolbar": "Show Toolbar",
     "code_only_note": "Note: Setting actions and stats options are available exclusively using Code Editor.",
     "selects": "Select Entities (Optional)",
-    "map_refresh": "Map Refresh Interval (Seconds)"
+    "map_refresh": "Map Refresh Interval (Seconds)",
+    "show_rooms": "Show Rooms"
   },
   "mode": {
     "vacuum": "Vacuum",

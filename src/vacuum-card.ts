@@ -26,13 +26,12 @@ import {
   VacuumActionParams,
   ExtendedHomeAssistant,
   SelectEntity,
+  VacuumEntityRegistryEntry,
+  VacuumRoom,
 } from './types';
 import {
   ValetudoEntities,
-  ValetudoRoom,
-  cleanValetudoRooms,
   findValetudoEntities,
-  getValetudoRooms,
   getValetudoSelects,
   getValetudoStats,
 } from './valetudo';
@@ -56,6 +55,8 @@ if (!customElements.get('ha-icon-button')) {
   );
 }
 
+const CLEAN_AREA_FEATURE = 16384;
+
 @customElement('vacuum-card')
 export class VacuumCard extends LitElement {
   @property({ attribute: false }) public hass!: ExtendedHomeAssistant;
@@ -63,6 +64,9 @@ export class VacuumCard extends LitElement {
   @state() private config!: VacuumCardConfig;
   @state() private requestInProgress = false;
   @state() private selectedRooms: string[] = [];
+  @state() private areaMapping?: Record<string, string[]> | null;
+
+  private areaMappingKey?: [string, unknown];
 
   private thumbUpdater: ReturnType<typeof setInterval> | null = null;
   private valetudoCache: {
@@ -155,16 +159,45 @@ export class VacuumCard extends LitElement {
     });
   }
 
-  get rooms(): ValetudoRoom[] {
-    const valetudo = this.valetudo;
+  get rooms(): VacuumRoom[] {
+    return Object.entries(this.areaMapping ?? {})
+      .filter(([, segments]) => segments.length > 0)
+      .map(([areaId]) => {
+        const area = this.hass.areas?.[areaId];
+        return {
+          id: areaId,
+          name: area?.name ?? areaId,
+          icon: area?.icon || 'mdi:texture-box',
+        };
+      });
+  }
+
+  get supportsCleanArea(): boolean {
+    const features = Number(this.entity?.attributes.supported_features ?? 0);
+    return (features & CLEAN_AREA_FEATURE) !== 0;
+  }
+
+  private async loadAreaMapping(): Promise<void> {
+    const key: [string, unknown] = [this.config.entity, this.hass.entities];
     if (
-      !valetudo?.identifier ||
-      (typeof this.config.valetudo === 'object' &&
-        this.config.valetudo.rooms === false)
+      this.areaMappingKey?.[0] === key[0] &&
+      this.areaMappingKey[1] === key[1]
     ) {
-      return [];
+      return;
     }
-    return getValetudoRooms(this.hass, valetudo);
+    this.areaMappingKey = key;
+
+    try {
+      const entry = await this.hass.callWS<VacuumEntityRegistryEntry>({
+        type: 'config/entity_registry/get',
+        entity_id: this.config.entity,
+      });
+      const mapping = entry.options?.vacuum?.area_mapping;
+      this.areaMapping =
+        mapping && Object.keys(mapping).length ? mapping : null;
+    } catch {
+      this.areaMapping = null;
+    }
   }
 
   private findDeviceBatteryEntity(): string | undefined {
@@ -195,13 +228,14 @@ export class VacuumCard extends LitElement {
       ...statEntities,
       valetudo?.error,
       valetudo?.statusFlag,
-      valetudo?.mapSegments,
     ].filter((id): id is string => !!id);
   }
 
   public setConfig(config: VacuumCardConfig): void {
     this.config = buildConfig(config);
     this.selectedRooms = [];
+    this.areaMappingKey = undefined;
+    this.areaMapping = undefined;
     if (this.isConnected) {
       this.startMapRefresh();
     }
@@ -228,6 +262,7 @@ export class VacuumCard extends LitElement {
       oldHass.locale !== this.hass.locale ||
       oldHass.themes !== this.hass.themes ||
       oldHass.entities !== this.hass.entities ||
+      oldHass.areas !== this.hass.areas ||
       oldHass.devices !== this.hass.devices
     ) {
       return true;
@@ -247,6 +282,10 @@ export class VacuumCard extends LitElement {
         this.hass.states[this.config.entity]?.state
     ) {
       this.requestInProgress = false;
+    }
+
+    if (this.config.show_rooms && this.hass) {
+      this.loadAreaMapping();
     }
   }
 
@@ -828,12 +867,11 @@ export class VacuumCard extends LitElement {
     }
   }
 
-  private handleCleanRooms(segmentIds: string[]): void {
-    const valetudo = this.valetudo;
-    if (!valetudo) {
-      return;
-    }
-    cleanValetudoRooms(this.hass, valetudo, segmentIds);
+  private handleCleanRooms(areaIds: string[]): void {
+    this.hass.callService('vacuum', 'clean_area', {
+      entity_id: this.config.entity,
+      cleaning_area_id: areaIds,
+    });
     this.selectedRooms = [];
     this.requestInProgress = true;
   }
@@ -845,13 +883,29 @@ export class VacuumCard extends LitElement {
   }
 
   private renderRooms(state: VacuumEntityState): Template {
-    const rooms = this.rooms;
     if (
+      !this.config.show_rooms ||
       !this.config.show_toolbar ||
-      !rooms.length ||
       ['cleaning', 'paused', 'returning'].includes(state)
     ) {
       return nothing;
+    }
+
+    if (!this.supportsCleanArea) {
+      return html`<div class="rooms-error">
+        ${localize('error.clean_area_unsupported')}
+      </div>`;
+    }
+
+    if (this.areaMapping === undefined) {
+      return nothing;
+    }
+
+    const rooms = this.rooms;
+    if (!rooms.length) {
+      return html`<div class="rooms-error">
+        ${localize('error.rooms_not_mapped')}
+      </div>`;
     }
 
     return html`
@@ -867,6 +921,7 @@ export class VacuumCard extends LitElement {
               aria-pressed=${this.selectedRooms.includes(room.id)}
               @click=${() => this.toggleRoom(room.id)}
             >
+              <ha-icon icon=${room.icon}></ha-icon>
               ${room.name}
             </button>
           `,
