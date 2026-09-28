@@ -264,6 +264,12 @@ ha-card {
   }
 }
 
+.stats-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
 .stats-value {
   font-size: 20px;
   color: var(--vc-primary-text-color);

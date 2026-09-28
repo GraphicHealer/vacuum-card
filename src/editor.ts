@@ -7,18 +7,23 @@ import {
 } from 'custom-card-helpers';
 import localize from './localize';
 import { customElement, property, query, state } from 'lit/decorators.js';
+import isEqual from 'lodash/isEqual';
 import {
   ExtendedHomeAssistant,
+  SelectEntity,
   Template,
   VacuumCardConfig,
+  VacuumCardSelect,
   VacuumCardShortcut,
+  VacuumCardStat,
   VacuumEntityRegistryEntry,
 } from './types';
 import {
   ValetudoEntities,
   findValetudoEntities,
+  getValetudoDefaults,
   getValetudoRooms,
-  getValetudoSelects,
+  normalizeSelect,
 } from './valetudo';
 import styles from './editor.css';
 
@@ -28,6 +33,29 @@ interface FormSchema {
   name: keyof VacuumCardConfig;
   required?: boolean;
   selector: Record<string, unknown>;
+}
+
+interface ItemSchema {
+  name: string;
+  required?: boolean;
+  selector: Record<string, unknown>;
+}
+
+type ItemValue = Record<string, unknown>;
+
+const DETECTED_KEYS = ['battery_entity', 'selects', 'stats'] as const;
+const SELECT_DOMAINS = ['select', 'input_select'];
+const STAT_STATES = ['default', 'cleaning'];
+
+function cleanItem<T extends ItemValue>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([, item]) =>
+        item !== undefined &&
+        item !== '' &&
+        !(Array.isArray(item) && item.length === 0),
+    ),
+  ) as T;
 }
 
 const SCHEMA: FormSchema[] = [
@@ -40,15 +68,6 @@ const SCHEMA: FormSchema[] = [
     name: 'battery_entity',
     selector: {
       entity: { filter: { domain: 'sensor', device_class: 'battery' } },
-    },
-  },
-  {
-    name: 'selects',
-    selector: {
-      entity: {
-        multiple: true,
-        filter: { domain: ['select', 'input_select'] },
-      },
     },
   },
   {
@@ -99,6 +118,8 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
 
   private mappingDialogListener?: (event: Event) => void;
 
+  private filledEntity?: string;
+
   setConfig(config: EditorConfig): void {
     this.config = { ...config };
   }
@@ -123,6 +144,58 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
         this.updateConfig({ ...this.config, entity });
       }
     }
+
+    this.fillDetected();
+  }
+
+  private detectedDefaults(
+    entity: string,
+  ): Partial<Pick<VacuumCardConfig, (typeof DETECTED_KEYS)[number]>> {
+    if (!this.hass) {
+      return {};
+    }
+    const valetudo = findValetudoEntities(this.hass, {
+      entity,
+      valetudo: this.config?.valetudo ?? true,
+    });
+    return getValetudoDefaults(this.hass, valetudo, {
+      cleaningTime: localize('stats.cleaning_time') ?? 'Cleaning time',
+      cleanedArea: localize('stats.cleaned_area') ?? 'Cleaned area',
+    });
+  }
+
+  private fillDetected(): void {
+    const entity = this.config?.entity;
+    if (!this.hass || !this.config || !entity || this.filledEntity === entity) {
+      return;
+    }
+
+    const previous = this.filledEntity
+      ? this.detectedDefaults(this.filledEntity)
+      : undefined;
+    this.filledEntity = entity;
+    const detected = this.detectedDefaults(entity);
+
+    const config: EditorConfig = { ...this.config };
+    let changed = false;
+    for (const key of DETECTED_KEYS) {
+      if (
+        previous &&
+        config[key] !== undefined &&
+        isEqual(config[key], previous[key])
+      ) {
+        delete config[key];
+        changed = true;
+      }
+      if (config[key] === undefined && detected[key] !== undefined) {
+        Object.assign(config, { [key]: detected[key] });
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.updateConfig(config);
+    }
   }
 
   private updateConfig(config: EditorConfig): void {
@@ -138,10 +211,6 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
       entity: this.config.entity,
       valetudo: this.config.valetudo ?? true,
     });
-  }
-
-  private getDetectedSelects(): string[] {
-    return getValetudoSelects(this.valetudo);
   }
 
   private get roomSource(): ValetudoEntities | null {
@@ -401,19 +470,220 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
       }
     }
 
-    if (
-      this.config.selects === undefined &&
-      value.entity === this.config.entity &&
-      String(value.selects) === String(this.getDetectedSelects())
-    ) {
-      delete value.selects;
-    }
-
     this.updateConfig({ ...value, type: this.config.type });
   }
 
   private computeLabel = ({ name }: FormSchema): string =>
     localize(`editor.${name}`) ?? name;
+
+  private computeItemLabel = ({ name }: ItemSchema): string =>
+    localize(`editor.item_${name}`) ?? name;
+
+  private entityName(entityId?: string): string | undefined {
+    return entityId
+      ? String(
+          this.hass?.states[entityId]?.attributes.friendly_name ?? entityId,
+        )
+      : undefined;
+  }
+
+  private renderItem(
+    header: string,
+    secondary: string,
+    schema: ItemSchema[],
+    data: ItemValue,
+    onChange: (value: ItemValue) => void,
+    onRemove: () => void,
+  ): Template {
+    return html`
+      <ha-expansion-panel outlined .header=${header} .secondary=${secondary}>
+        <div class="item">
+          <ha-form
+            .hass=${this.hass}
+            .data=${data}
+            .schema=${schema}
+            .computeLabel=${this.computeItemLabel}
+            @value-changed=${(event: CustomEvent<{ value: ItemValue }>) => {
+              event.stopPropagation();
+              onChange(cleanItem(event.detail.value));
+            }}
+          ></ha-form>
+          <ha-button variant="danger" appearance="plain" @click=${onRemove}>
+            ${localize('editor.remove')}
+          </ha-button>
+        </div>
+      </ha-expansion-panel>
+    `;
+  }
+
+  private renderAddEntity(
+    filter: Record<string, unknown>,
+    onAdd: (entityId: string) => void,
+  ): Template {
+    return html`
+      <ha-form
+        .hass=${this.hass}
+        .data=${{}}
+        .schema=${[{ name: 'add', selector: { entity: { filter } } }]}
+        .computeLabel=${this.computeItemLabel}
+        @value-changed=${(event: CustomEvent<{ value: { add?: string } }>) => {
+          event.stopPropagation();
+          if (event.detail.value.add) {
+            onAdd(event.detail.value.add);
+          }
+        }}
+      ></ha-form>
+    `;
+  }
+
+  private setSelects(items: VacuumCardSelect[]): void {
+    this.updateConfig({
+      ...this.config!,
+      selects: items.map((item) =>
+        item.name || item.icon || item.options?.length ? item : item.entity,
+      ),
+    });
+  }
+
+  private selectSchema({ entity }: VacuumCardSelect): ItemSchema[] {
+    const stateObj = this.hass?.states[entity] as SelectEntity | undefined;
+    const options = stateObj?.attributes.options ?? [];
+    return [
+      {
+        name: 'entity',
+        required: true,
+        selector: { entity: { filter: { domain: SELECT_DOMAINS } } },
+      },
+      { name: 'name', selector: { text: {} } },
+      {
+        name: 'icon',
+        selector: { icon: { placeholder: stateObj?.attributes.icon } },
+      },
+      {
+        name: 'options',
+        selector: {
+          select: {
+            multiple: true,
+            mode: 'list',
+            options: options.map((value) => ({
+              value,
+              label:
+                (stateObj && this.hass?.formatEntityState?.(stateObj, value)) ||
+                value,
+            })),
+          },
+        },
+      },
+    ];
+  }
+
+  private renderSelects(): Template {
+    const items = (this.config?.selects ?? []).map(normalizeSelect);
+
+    return html`
+      <div class="items">
+        <div class="items-title">${localize('editor.selects')}</div>
+        ${items.map((item, index) =>
+          this.renderItem(
+            item.name || (this.entityName(item.entity) ?? item.entity),
+            item.entity,
+            this.selectSchema(item),
+            { ...item },
+            (value) =>
+              this.setSelects(
+                items.map((old, i) =>
+                  i === index ? (value as unknown as VacuumCardSelect) : old,
+                ),
+              ),
+            () => this.setSelects(items.filter((_, i) => i !== index)),
+          ),
+        )}
+        ${this.renderAddEntity({ domain: SELECT_DOMAINS }, (entity) =>
+          this.setSelects([...items, { entity }]),
+        )}
+      </div>
+    `;
+  }
+
+  private setStats(state: string, list: VacuumCardStat[]): void {
+    const stats = { ...(this.config!.stats ?? {}) };
+    if (list.length) {
+      stats[state] = list;
+    } else {
+      delete stats[state];
+    }
+    this.updateConfig({ ...this.config!, stats });
+  }
+
+  private statSchema(stat: VacuumCardStat): ItemSchema[] {
+    const entityId = stat.entity_id || this.config?.entity;
+    return [
+      { name: 'entity_id', selector: { entity: {} } },
+      { name: 'attribute', selector: { attribute: { entity_id: entityId } } },
+      { name: 'subtitle', selector: { text: {} } },
+      {
+        name: 'icon',
+        selector: {
+          icon: {
+            placeholder: entityId
+              ? this.hass?.states[entityId]?.attributes.icon
+              : undefined,
+          },
+        },
+      },
+      { name: 'unit', selector: { text: {} } },
+      { name: 'value_template', selector: { template: {} } },
+    ];
+  }
+
+  private renderStats(state: string, list: VacuumCardStat[]): Template {
+    const title =
+      state === 'default'
+        ? localize('editor.stats_default')
+        : localize(
+            'editor.stats_state',
+            '{state}',
+            localize(`status.${state}`) ?? state,
+          );
+
+    return html`
+      <div class="items">
+        <div class="items-title">${title}</div>
+        ${list.map((stat, index) =>
+          this.renderItem(
+            stat.subtitle ||
+              this.entityName(stat.entity_id) ||
+              stat.attribute ||
+              '',
+            [stat.entity_id, stat.attribute].filter(Boolean).join(' · '),
+            this.statSchema(stat),
+            { ...stat },
+            (value) =>
+              this.setStats(
+                state,
+                list.map((old, i) => (i === index ? value : old)),
+              ),
+            () =>
+              this.setStats(
+                state,
+                list.filter((_, i) => i !== index),
+              ),
+          ),
+        )}
+        ${this.renderAddEntity({}, (entity_id) =>
+          this.setStats(state, [...list, { entity_id }]),
+        )}
+      </div>
+    `;
+  }
+
+  private renderAllStats(): Template {
+    const stats = this.config?.stats ?? {};
+    const states = [...new Set([...STAT_STATES, ...Object.keys(stats)])];
+    return html`${states.map((state) =>
+      this.renderStats(state, stats[state] ?? []),
+    )}`;
+  }
 
   protected render(): Template {
     if (!this.hass || !this.config) {
@@ -426,13 +696,13 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
           .hass=${this.hass}
           .data=${{
             ...DEFAULTS,
-            selects: this.getDetectedSelects(),
             ...this.config,
           }}
           .schema=${SCHEMA}
           .computeLabel=${this.computeLabel}
           @value-changed=${this.valueChanged}
         ></ha-form>
+        ${this.renderSelects()} ${this.renderAllStats()}
         ${this.renderRoomShortcuts()}
         <strong>${localize('editor.code_only_note')}</strong>
       </div>

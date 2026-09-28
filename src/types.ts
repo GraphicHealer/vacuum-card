@@ -46,6 +46,14 @@ export interface VacuumCardStat {
   value_template?: string;
   unit?: string;
   subtitle?: string;
+  icon?: string;
+}
+
+export interface VacuumCardSelect {
+  entity: string;
+  name?: string;
+  icon?: string;
+  options?: string[];
 }
 
 export interface VacuumCardAction {
@@ -70,7 +78,7 @@ export interface ValetudoConfig {
 export interface VacuumCardConfig {
   entity: string;
   battery_entity: string;
-  selects?: string[];
+  selects?: (string | VacuumCardSelect)[];
   valetudo: ValetudoConfig | boolean;
   map: string;
   map_refresh: number;
@@ -79,7 +87,7 @@ export interface VacuumCardConfig {
   show_status: boolean;
   show_toolbar: boolean;
   compact_view: boolean;
-  stats: Record<string, VacuumCardStat[]>;
+  stats?: Record<string, VacuumCardStat[]>;
   actions: Record<string, VacuumCardAction>;
   shortcuts: VacuumCardShortcut[];
 }
