@@ -29,6 +29,14 @@ export const TOOLBAR_BUTTONS: Record<
   },
 };
 
+export function toolbarOrder(actions?: Record<string, unknown>): string[] {
+  const keys = Object.keys(TOOLBAR_BUTTONS);
+  const configured = Object.keys(actions ?? {}).filter((key) =>
+    keys.includes(key),
+  );
+  return [...configured, ...keys.filter((key) => !configured.includes(key))];
+}
+
 export const SHORTCUT_STATES = ['docked', 'idle', 'error'];
 
 export function vacuumStateGroup(state: string): string {
