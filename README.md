@@ -55,12 +55,12 @@ This card can be configured using Lovelace UI editor.
 3. Click Plus button to add a new card.
 4. Find _Custom: Vacuum Card_ in the list.
 5. Choose `entity`.
-6. Optionally pick a battery sensor and map camera, add **Header Dropdowns** (`select` entities such as cleaning mode or water level, shown next to fan speed) and **Sensors** (stats), each with its own name, icon and options.
+6. Optionally pick a battery sensor and map camera, add **Header Dropdowns** (`select` entities such as cleaning mode or water level, shown next to fan speed), **Sensors** (stats) and **Shortcuts**, each with its own name, icon and options.
 7. Now you should see the preview of the card!
 
 For a Valetudo vacuum, the editor writes everything it detects (battery sensor, header dropdowns and sensors) into the card config, so you can edit or remove any of it in the editor or in YAML.
 
-_Sorry, no support for `actions` and `shortcuts` in visual config yet._
+_Sorry, no support for `actions` in visual config yet._
 
 Typical example of using this card in YAML config would look like this:
 
@@ -203,7 +203,7 @@ Set `valetudo: false` to turn off auto-detection completely.
 
 #### Room shortcuts
 
-For a Valetudo vacuum with a `sensor.*_map_segments` sensor, the visual editor shows a **Generate Room Shortcuts** button. It adds one [shortcut](#shortcuts-object) per room, named after the room in Valetudo and using the icon of the Home Assistant area the room is mapped to. If any room isn't mapped to an area yet, a pop-up lists those rooms and explains how to map them. **Continue** opens the vacuum's settings, where you pick **Map vacuum segments to areas** and save. When you close the settings, the editor checks the mapping again: if everything is mapped the shortcuts are generated, otherwise a _"The locations are not mapped. Please try again."_ pop-up offers **Try Again** (reopens the settings) or **Cancel**. Existing shortcuts that publish to the same room-cleaning topic (e.g. ones generated earlier or written by hand) are replaced; all other shortcuts are kept.
+For a Valetudo vacuum with a `sensor.*_map_segments` sensor, the visual editor shows a **Generate Room Shortcuts** button. It adds one [shortcut](#shortcuts-object) per room, named after the room in Valetudo and using the icon of the Home Assistant area the room is mapped to. If any room isn't mapped to an area yet, a pop-up lists those rooms and explains how to map them. **Continue** opens the vacuum's settings, where you pick **Map vacuum segments to areas** and save. When you close the settings, the editor checks the mapping again: if everything is mapped the shortcuts are generated, otherwise a _"The locations are not mapped. Please try again."_ pop-up offers **Try Again** (reopens the settings) or **Cancel**. The button sits below the **Shortcuts** list. Rooms that already have a shortcut (one publishing to the same room-cleaning topic with that room's segment id, whether generated earlier or written by hand) are skipped, so clicking it again only adds new rooms and never duplicates or changes existing shortcuts.
 
 Each generated shortcut looks like this:
 
