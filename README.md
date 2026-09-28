@@ -46,18 +46,28 @@ This card can be configured using Lovelace UI editor.
 3. Click Plus button to add a new card.
 4. Find _Custom: Vacuum Card_ in the list.
 5. Choose `entity`.
-6. Optionally pick a battery sensor and map camera, add **Header Dropdowns** (fan speed, plus `select` entities such as cleaning mode or water level), **Sensors** (stats) and **Shortcuts**, each with its own name, icon and options.
+6. Optionally pick a battery sensor and map camera, and edit the collapsible **Header Dropdowns** (fan speed, plus `select` entities such as cleaning mode or water level), **Sensors** (stats), **Shortcuts** and **Toolbar Actions** sections, each item with its own name, icon, options and visibility. Header Dropdowns and Sensors have an **Add entity** button that opens the entity picker.
 7. Now you should see the preview of the card!
 
-For any vacuum, the editor writes everything it detects into the card config, so you can edit or remove any of it in the editor or in YAML. It picks the vacuum device's battery sensor (if the vacuum has no `battery_level` attribute), its `select` entities as header dropdowns, and consumable (brush, filter, mop, …) and cleaning time / area sensors as sensors. Valetudo robots get [more specific detection](#valetudo).
+For any vacuum, the editor writes everything it detects into the card config, so you can edit or remove any of it in the editor or in YAML. It looks at the entities on the vacuum's device:
+
+| Detected entity                                                                                                  | Used for                         | Written to       |
+| ---------------------------------------------------------------------------------------------------------------- | -------------------------------- | ---------------- |
+| Sensor with `device_class: battery` (only if the vacuum has no `battery_level` attribute)                        | Battery level and icon           | `battery_entity` |
+| The vacuum itself (if it has a `fan_speed_list`)                                                                 | Fan speed dropdown               | `selects`        |
+| Every `select` / `input_select` entity                                                                           | Header dropdowns                 | `selects`        |
+| Consumable sensors (brush, filter, sensor_dirty, mop, pad, detergent, dust_bag, wheel) in `%`, `h`, `min` or `s` | Sensors shown while not cleaning | `stats`          |
+| `sensor.*_cleaning_time` / `sensor.*_cleaning_area`                                                              | Sensors shown while cleaning     | `stats`          |
+
+Every `select` on the device is added, which may include ones you don't want (e.g. a map selector); remove them in the editor. Valetudo robots get [more specific detection](#valetudo).
 
 Shortcuts use Home Assistant's action picker: choose an action (e.g. `mqtt.publish`) and its fields and target are shown for you to fill in. It is saved in the same `action` / `data` / `target` format as automations.
 
 The collapsible **Toolbar Actions** section sets what the main buttons (clean / continue, pause, stop, locate, return to base) do and when they show. The editor fills each one with its standard vacuum action (e.g. `vacuum.start` targeting your vacuum) and the vacuum statuses it normally shows for, so you can change both. A button whose action is cleared falls back to the standard vacuum action.
 
-Drag the handle next to any sensor, header dropdown, shortcut or toolbar action to reorder it; the card shows them in the same order as the config.
+Drag the handle next to any sensor, header dropdown, shortcut or toolbar action to reorder it. The new order is saved to the YAML (list order for `stats`, `selects` and `shortcuts`, key order for `actions`), and the card shows them in that order.
 
-Toolbar actions, sensors and shortcuts each have a **Show when status is** checklist (`states` in YAML) with the vacuum statuses `cleaning`, `docked`, `idle`, `paused`, `returning` and `error`.
+Toolbar actions, sensors and shortcuts each have a **Show when status is** checklist (`states` in YAML) with the vacuum statuses `cleaning`, `docked`, `idle`, `paused`, `returning` and `error`. Integration-specific cleaning states such as `on`, `auto`, `spot`, `edge` or `single_room` count as `cleaning`. An empty list (`states: []`) hides the item.
 
 Typical example of using this card in YAML config would look like this:
 
@@ -66,6 +76,8 @@ type: 'custom:vacuum-card'
 entity: vacuum.vacuum_cleaner
 battery_entity: sensor.vacuum_cleaner_battery
 selects:
+  - entity: vacuum.vacuum_cleaner
+    icon: mdi:fan
   - select.vacuum_cleaner_mode
   - select.vacuum_cleaner_water
 map: camera.vacuum_cleaner_map
@@ -75,6 +87,10 @@ actions:
     data:
       entity_id: vacuum.vacuum_cleaner
       segments: [16, 20]
+    states:
+      - docked
+      - idle
+      - paused
 stats:
   - attribute: filter_left
     unit: hours
@@ -84,13 +100,13 @@ stats:
     subtitle: Side brush
   - entity_id: sensor.vacuum_main_brush_left
     value_template: '{{ (value | float(0) / 3600) | round(1) }}'
+    unit: hours
     subtitle: Main brush
+  - attribute: cleaning_time
+    unit: minutes
+    subtitle: Cleaning time
     states:
       - cleaning
-      unit: hours
-    - attribute: cleaning_time
-      unit: minutes
-      subtitle: Cleaning time
 shortcuts:
   - name: Clean living room
     action: script.clean_living_room
@@ -176,6 +192,7 @@ The card then uses these entities from the same device, if the robot has them:
 | `select.*_mode`, `select.*_water`               | Mode and water dropdowns                                              | `selects`        |
 | `sensor.*_error`, `sensor.*_status_flag`        | More detailed status (e.g. _Segment cleaning_, the actual error text) | —                |
 | Consumable sensors (`mdi:progress-wrench`)      | Sensors while not cleaning (hours / % remaining)                      | `stats`          |
+| The vacuum's fan speeds                         | Fan speed dropdown                                                    | `selects`        |
 | `sensor.*_current_statistics_time` / `..._area` | Sensors while cleaning (minutes, m²)                                  | `stats`          |
 
 Anything you configure explicitly takes precedence. The visual editor writes the detected `battery_entity`, `selects` and `stats` into the card config, so you can change icons, names and options or remove items. Use `selects: []` or `stats: []` to show none; if a key is left out entirely, the card falls back to auto-detection.
@@ -206,7 +223,7 @@ shortcuts:
 
 ### `stats` array
 
-You can use any attribute of vacuum or even any entity by `entity_id` to display by stats section. You can also combine `attribute` with `entity_id` to extract an attribute value of specific entity. Use `states` to show a stat only for some vacuum statuses; without it the stat is always shown. In the visual editor this is the **Sensors** list.
+You can use any attribute of vacuum or even any entity by `entity_id` to display by stats section. You can also combine `attribute` with `entity_id` to extract an attribute value of specific entity. Use `states` to show a stat only for some vacuum statuses; without it the stat is always shown. In the visual editor this is the **Sensors** list. The old grouped format (`stats: { default: [...], cleaning: [...] }`) is still read and converted to a list with `states`.
 
 | Name             |   Type   | Default  | Description                                                                                          |
 | ---------------- | :------: | -------- | ---------------------------------------------------------------------------------------------------- |
@@ -220,7 +237,7 @@ You can use any attribute of vacuum or even any entity by `entity_id` to display
 
 ### `actions` object
 
-You can define action calls to override default actions behavior. Available actions to override are `start` (also shown as Continue while paused or returning), `pause`, `stop`, `locate` and `return_to_base`. They use the same `action` / `data` / `target` format as automations, and the visual editor pre-fills them with the standard vacuum actions:
+You can define action calls to override default actions behavior. Available actions to override are `start` (also shown as Continue while paused or returning), `pause`, `stop`, `locate` and `return_to_base`. They use the same `action` / `data` / `target` format as automations, and the visual editor pre-fills them with the standard vacuum actions. The order of the keys is the order of the buttons in the toolbar; buttons you leave out keep their default position after the listed ones.
 
 ```yaml
 actions:
@@ -242,7 +259,7 @@ actions:
 
 ### `shortcuts` object
 
-You can defined [custom scripts][ha-scripts] for custom actions i.e cleaning specific room and add them to this card with `shortcuts` option.
+Shortcuts are buttons for any action, e.g. [scripts][ha-scripts] or [room cleaning](#room-shortcuts). They use the same `action` / `data` / `target` format as automations; the old `service` / `service_data` keys are no longer supported.
 
 | Name     |   Type   | Default  | Description                                                                   |
 | -------- | :------: | -------- | ----------------------------------------------------------------------------- |
