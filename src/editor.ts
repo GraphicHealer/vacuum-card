@@ -210,6 +210,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     ExtendedHomeAssistant;
 
   @state() private config?: EditorConfig;
+  @state() private addingTo?: string;
   @state() private roomsMessage?: {
     type: 'error' | 'info' | 'success';
     text: string;
@@ -605,6 +606,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
                 { name: localize('editor.new_shortcut') ?? 'Shortcut' },
               ])}
           >
+            <ha-icon slot="start" icon="mdi:plus"></ha-icon>
             ${localize('editor.shortcut_add')}
           </ha-button>
           ${this.renderRoomShortcuts()}
@@ -701,22 +703,43 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
   }
 
   private renderAddEntity(
+    key: string,
     filter: Record<string, unknown>,
     onAdd: (entityId: string) => void,
   ): Template {
+    if (this.addingTo !== key) {
+      return html`
+        <ha-button appearance="plain" @click=${() => (this.addingTo = key)}>
+          <ha-icon slot="start" icon="mdi:plus"></ha-icon>
+          ${localize('editor.item_add')}
+        </ha-button>
+      `;
+    }
+
     return html`
-      <ha-form
-        .hass=${this.hass}
-        .data=${{}}
-        .schema=${[{ name: 'add', selector: { entity: { filter } } }]}
-        .computeLabel=${this.computeItemLabel}
-        @value-changed=${(event: CustomEvent<{ value: { add?: string } }>) => {
-          event.stopPropagation();
-          if (event.detail.value.add) {
-            onAdd(event.detail.value.add);
-          }
-        }}
-      ></ha-form>
+      <div class="add-entity">
+        <ha-form
+          .hass=${this.hass}
+          .data=${{}}
+          .schema=${[{ name: 'add', selector: { entity: { filter } } }]}
+          .computeLabel=${this.computeItemLabel}
+          @value-changed=${(
+            event: CustomEvent<{ value: { add?: string } }>,
+          ) => {
+            event.stopPropagation();
+            if (event.detail.value.add) {
+              this.addingTo = undefined;
+              onAdd(event.detail.value.add);
+            }
+          }}
+        ></ha-form>
+        <ha-button
+          appearance="plain"
+          @click=${() => (this.addingTo = undefined)}
+        >
+          ${localize('editor.cancel')}
+        </ha-button>
+      </div>
     `;
   }
 
@@ -810,8 +833,10 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
               () => this.setSelects(items.filter((_, i) => i !== index)),
             ),
           )}
-          ${this.renderAddEntity({ domain: SELECT_DOMAINS }, (entity) =>
-            this.setSelects([...items, { entity }]),
+          ${this.renderAddEntity(
+            'selects',
+            { domain: SELECT_DOMAINS },
+            (entity) => this.setSelects([...items, { entity }]),
           )}
         </div>
       </ha-expansion-panel>
@@ -887,7 +912,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
                 ),
             ),
           )}
-          ${this.renderAddEntity({}, (entity_id) =>
+          ${this.renderAddEntity(`stats.${state}`, {}, (entity_id) =>
             this.setStats(state, [...list, { entity_id }]),
           )}
         </div>
