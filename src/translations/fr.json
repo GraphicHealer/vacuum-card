@@ -65,17 +65,9 @@
     "map": "Caméra de carte (facultatif)",
     "image": "Image (facultatif)",
     "compact_view": "Vue compacte",
-    "compact_view_aria_label_on": "Activer la vue compacte",
-    "compact_view_aria_label_off": "Désactiver la vue compacte",
     "show_name": "Afficher le nom",
-    "show_name_aria_label_on": "Activer affichage du nom",
-    "show_name_aria_label_off": "Désactiver affichage du nom",
     "show_status": "Afficher l'état",
-    "show_status_aria_label_on": "Activer l'affichage de l'état",
-    "show_status_aria_label_off": "Désactiver l'affichage de l'état",
     "show_toolbar": "Afficher la barre d'outils",
-    "show_toolbar_aria_label_on": "Activer l'affichage de la barre d'outils",
-    "show_toolbar_aria_label_off": "Désactiver l'affichage de la barre d'outils",
     "code_only_note": "Remarque: Les options de réglage des actions et statistiques sont disponibles exclusivement en utilisant l'éditeur de code."
   }
 }

@@ -65,17 +65,9 @@
     "map": "Karttakamera (valinnainen)",
     "image": "Kuva (valinnainen)",
     "compact_view": "Kompakti näkymä",
-    "compact_view_aria_label_on": "Kompakti näkymä päälle",
-    "compact_view_aria_label_off": "Kompakti näkymä pois",
     "show_name": "Näytä nimi",
-    "show_name_aria_label_on": "Näyttönimi päälle",
-    "show_name_aria_label_off": "Näyttönimi pois",
     "show_status": "Näytä tila",
-    "show_status_aria_label_on": "Näyttönimi päällä",
-    "show_status_aria_label_off": "Näyttönimi pois",
     "show_toolbar": "Näytä työkalurivi",
-    "show_toolbar_aria_label_on": "Työkalurivi päälle",
-    "show_toolbar_aria_label_off": "Työkalurivi pois",
     "code_only_note": "Huomaa: toimintojen ja tilastojen asetukset saatavilla ainoastaan koodieditorissa."
   }
 }

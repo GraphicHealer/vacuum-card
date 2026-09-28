@@ -1,8 +1,10 @@
 import {
+  HassEntity,
   HassEntityAttributeBase,
   HassEntityBase,
   HassServiceTarget,
 } from 'home-assistant-js-websocket';
+import { HomeAssistant } from 'custom-card-helpers';
 import { TemplateResult, nothing } from 'lit';
 
 export * from 'home-assistant-js-websocket';
@@ -60,9 +62,17 @@ export interface VacuumCardShortcut {
   target?: HassServiceTarget;
 }
 
+export interface ValetudoConfig {
+  topic_prefix?: string;
+  identifier?: string;
+  rooms?: boolean;
+}
+
 export interface VacuumCardConfig {
   entity: string;
   battery_entity: string;
+  selects?: string[];
+  valetudo: ValetudoConfig | boolean;
   map: string;
   map_refresh: number;
   image: string;
@@ -81,4 +91,32 @@ export interface VacuumServiceCallParams {
 
 export interface VacuumActionParams extends VacuumServiceCallParams {
   defaultService?: string;
+}
+
+export interface EntityRegistryDisplayEntry {
+  entity_id: string;
+  name?: string | null;
+  device_id?: string;
+  platform?: string;
+}
+
+export interface DeviceRegistryEntry {
+  id: string;
+  identifiers: [string, string][];
+  manufacturer: string | null;
+  name: string | null;
+  name_by_user: string | null;
+}
+
+export interface ExtendedHomeAssistant extends HomeAssistant {
+  entities?: Record<string, EntityRegistryDisplayEntry>;
+  devices?: Record<string, DeviceRegistryEntry>;
+  formatEntityState?: (stateObj: HassEntity, state?: string) => string;
+}
+
+export interface SelectEntity extends HassEntityBase {
+  attributes: HassEntityAttributeBase & {
+    options?: string[];
+    icon?: string;
+  };
 }

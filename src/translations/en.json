@@ -22,7 +22,8 @@
     "updating": "Updating",
     "going_to_target": "Going to target",
     "zoned_cleaning": "Zoned cleaning",
-    "segment_cleaning": "Segment cleaning"
+    "segment_cleaning": "Segment cleaning",
+    "mapping": "Mapping"
   },
   "source": {
     "gentle": "Gentle",
@@ -39,7 +40,9 @@
     "auto": "Auto",
     "balanced": "Balanced",
     "custom": "Custom",
-    "off": "Off"
+    "off": "Off",
+    "min": "Min",
+    "low": "Low"
   },
   "common": {
     "name": "Vacuum Card",
@@ -50,7 +53,8 @@
     "stop": "Stop",
     "return_to_base": "Dock",
     "locate": "Locate Vacuum",
-    "not_available": "Vacuum is not available"
+    "not_available": "Vacuum is not available",
+    "clean_rooms": "Clean {count} rooms"
   },
   "error": {
     "invalid_config": "Invalid configuration",
@@ -65,17 +69,21 @@
     "map": "Map Camera (Optional)",
     "image": "Image (Optional)",
     "compact_view": "Compact View",
-    "compact_view_aria_label_on": "Toggle compact view on",
-    "compact_view_aria_label_off": "Toggle compact view off",
     "show_name": "Show Name",
-    "show_name_aria_label_on": "Toggle display name on",
-    "show_name_aria_label_off": "Toggle display name off",
     "show_status": "Show Status",
-    "show_status_aria_label_on": "Toggle display status on",
-    "show_status_aria_label_off": "Toggle display status off",
     "show_toolbar": "Show Toolbar",
-    "show_toolbar_aria_label_on": "Toggle display toolbar on",
-    "show_toolbar_aria_label_off": "Toggle display toolbar off",
-    "code_only_note": "Note: Setting actions and stats options are available exclusively using Code Editor."
+    "code_only_note": "Note: Setting actions and stats options are available exclusively using Code Editor.",
+    "selects": "Select Entities (Optional)",
+    "map_refresh": "Map Refresh Interval (Seconds)"
+  },
+  "mode": {
+    "vacuum": "Vacuum",
+    "mop": "Mop",
+    "vacuum_and_mop": "Vacuum & mop",
+    "vacuum_then_mop": "Vacuum, then mop"
+  },
+  "stats": {
+    "cleaning_time": "Cleaning time",
+    "cleaned_area": "Cleaned area"
   }
 }

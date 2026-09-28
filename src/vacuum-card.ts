@@ -3,9 +3,7 @@ import type { CSSResultGroup, PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import {
-  hasConfigOrEntityChanged,
   fireEvent,
-  HomeAssistant,
   ServiceCallRequest,
   computeStateDisplay,
   stateIcon,
@@ -19,13 +17,25 @@ import {
   Template,
   VacuumCardAction,
   VacuumCardConfig,
+  VacuumCardStat,
   VacuumEntity,
   HassEntity,
   VacuumBatteryEntity,
   VacuumEntityState,
   VacuumServiceCallParams,
   VacuumActionParams,
+  ExtendedHomeAssistant,
+  SelectEntity,
 } from './types';
+import {
+  ValetudoEntities,
+  ValetudoRoom,
+  cleanValetudoRooms,
+  findValetudoEntities,
+  getValetudoRooms,
+  getValetudoSelects,
+  getValetudoStats,
+} from './valetudo';
 import DEFAULT_IMAGE from './vacuum.svg';
 
 registerTemplates();
@@ -48,11 +58,17 @@ if (!customElements.get('ha-icon-button')) {
 
 @customElement('vacuum-card')
 export class VacuumCard extends LitElement {
-  @property({ attribute: false }) public hass!: HomeAssistant;
+  @property({ attribute: false }) public hass!: ExtendedHomeAssistant;
 
   @state() private config!: VacuumCardConfig;
   @state() private requestInProgress = false;
-  @state() private thumbUpdater: ReturnType<typeof setInterval> | null = null;
+  @state() private selectedRooms: string[] = [];
+
+  private thumbUpdater: ReturnType<typeof setInterval> | null = null;
+  private valetudoCache: {
+    key: unknown[];
+    value: ValetudoEntities | null;
+  } | null = null;
 
   static get styles(): CSSResultGroup {
     return styles;
@@ -82,16 +98,113 @@ export class VacuumCard extends LitElement {
     return this.hass.states[this.config.map];
   }
 
+  get valetudo(): ValetudoEntities | null {
+    if (!this.hass || !this.config) {
+      return null;
+    }
+
+    const key = [
+      this.config,
+      this.hass.entities,
+      this.hass.devices,
+      this.hass.entities ? null : Object.keys(this.hass.states).length,
+    ];
+
+    if (
+      !this.valetudoCache ||
+      this.valetudoCache.key.some((value, i) => value !== key[i])
+    ) {
+      this.valetudoCache = {
+        key,
+        value: findValetudoEntities(this.hass, this.config),
+      };
+    }
+
+    return this.valetudoCache.value;
+  }
+
   get batteryEntity(): VacuumBatteryEntity | null {
-    const batteryEntityId = this.config.battery_entity;
-    if (!this.hass || !batteryEntityId) {
+    if (!this.hass) {
+      return null;
+    }
+
+    const batteryEntityId =
+      this.config.battery_entity ||
+      (this.entity?.attributes.battery_level == null
+        ? (this.valetudo?.battery ?? this.findDeviceBatteryEntity())
+        : undefined);
+
+    if (!batteryEntityId) {
       return null;
     }
     return (this.hass.states[batteryEntityId] as VacuumBatteryEntity) ?? null;
   }
 
+  get selectEntityIds(): string[] {
+    return this.config.selects ?? getValetudoSelects(this.valetudo);
+  }
+
+  get stats(): Record<string, VacuumCardStat[]> {
+    if (Object.keys(this.config.stats).length || !this.valetudo) {
+      return this.config.stats;
+    }
+
+    return getValetudoStats(this.hass, this.valetudo, {
+      cleaningTime: localize('stats.cleaning_time') ?? 'Cleaning time',
+      cleanedArea: localize('stats.cleaned_area') ?? 'Cleaned area',
+    });
+  }
+
+  get rooms(): ValetudoRoom[] {
+    const valetudo = this.valetudo;
+    if (
+      !valetudo?.identifier ||
+      (typeof this.config.valetudo === 'object' &&
+        this.config.valetudo.rooms === false)
+    ) {
+      return [];
+    }
+    return getValetudoRooms(this.hass, valetudo);
+  }
+
+  private findDeviceBatteryEntity(): string | undefined {
+    const deviceId = this.hass.entities?.[this.config.entity]?.device_id;
+    if (!deviceId || !this.hass.entities) {
+      return undefined;
+    }
+
+    return Object.values(this.hass.entities).find(
+      ({ entity_id, device_id }) =>
+        device_id === deviceId &&
+        entity_id.startsWith('sensor.') &&
+        this.hass.states[entity_id]?.attributes.device_class === 'battery',
+    )?.entity_id;
+  }
+
+  private getWatchedEntityIds(): string[] {
+    const valetudo = this.valetudo;
+    const statEntities = Object.values(this.stats)
+      .flat()
+      .map((stat) => stat.entity_id);
+
+    return [
+      this.config.entity,
+      this.config.map,
+      this.batteryEntity?.entity_id,
+      ...this.selectEntityIds,
+      ...statEntities,
+      valetudo?.error,
+      valetudo?.statusFlag,
+      valetudo?.mapSegments,
+    ].filter((id): id is string => !!id);
+  }
+
   public setConfig(config: VacuumCardConfig): void {
     this.config = buildConfig(config);
+    this.selectedRooms = [];
+    if (this.isConnected) {
+      this.startMapRefresh();
+    }
   }
 
   public getCardSize(): number {
@@ -99,14 +212,39 @@ export class VacuumCard extends LitElement {
   }
 
   public shouldUpdate(changedProps: PropertyValues): boolean {
-    return hasConfigOrEntityChanged(this, changedProps, false);
+    if (!this.config) {
+      return false;
+    }
+
+    if (changedProps.size > 1 || !changedProps.has('hass')) {
+      return true;
+    }
+
+    const oldHass = changedProps.get('hass') as
+      ExtendedHomeAssistant | undefined;
+
+    if (
+      !oldHass ||
+      oldHass.locale !== this.hass.locale ||
+      oldHass.themes !== this.hass.themes ||
+      oldHass.entities !== this.hass.entities ||
+      oldHass.devices !== this.hass.devices
+    ) {
+      return true;
+    }
+
+    return this.getWatchedEntityIds().some(
+      (id) => oldHass.states[id] !== this.hass.states[id],
+    );
   }
 
   protected updated(changedProps: PropertyValues) {
+    const oldHass = changedProps.get('hass') as
+      ExtendedHomeAssistant | undefined;
     if (
-      changedProps.get('hass') &&
-      changedProps.get('hass').states[this.config.entity].state !==
-        this.hass.states[this.config.entity].state
+      oldHass &&
+      oldHass.states[this.config.entity]?.state !==
+        this.hass.states[this.config.entity]?.state
     ) {
       this.requestInProgress = false;
     }
@@ -114,19 +252,29 @@ export class VacuumCard extends LitElement {
 
   public connectedCallback() {
     super.connectedCallback();
-    if (!this.config.compact_view && this.map) {
-      this.requestUpdate();
-      this.thumbUpdater = setInterval(
-        () => this.requestUpdate(),
-        this.config.map_refresh * 1000,
-      );
-    }
+    this.startMapRefresh();
   }
 
   public disconnectedCallback() {
     super.disconnectedCallback();
-    if (this.map && this.thumbUpdater) {
+    this.stopMapRefresh();
+  }
+
+  private startMapRefresh() {
+    this.stopMapRefresh();
+    if (!this.config || this.config.compact_view || !this.config.map) {
+      return;
+    }
+    this.thumbUpdater = setInterval(
+      () => this.requestUpdate(),
+      Math.max(this.config.map_refresh, 1) * 1000,
+    );
+  }
+
+  private stopMapRefresh() {
+    if (this.thumbUpdater) {
       clearInterval(this.thumbUpdater);
+      this.thumbUpdater = null;
     }
   }
 
@@ -178,6 +326,18 @@ export class VacuumCard extends LitElement {
     );
   }
 
+  private handleSelectOption(entityId: string, option?: string): void {
+    if (!option || this.hass.states[entityId]?.state === option) {
+      return;
+    }
+
+    const [domain] = entityId.split('.');
+    this.hass.callService(domain, 'select_option', {
+      entity_id: entityId,
+      option,
+    });
+  }
+
   private renderDropdown({
     icon,
     value,
@@ -185,6 +345,7 @@ export class VacuumCard extends LitElement {
     onSelect,
     formatLabel,
     ariaLabel,
+    renderIcon,
   }: {
     icon: string;
     value: string;
@@ -192,6 +353,7 @@ export class VacuumCard extends LitElement {
     onSelect: (e: CustomEvent<{ item?: { value?: string } }>) => void;
     formatLabel: (value: string) => string;
     ariaLabel?: string;
+    renderIcon?: (value?: string) => Template;
   }): Template {
     const selectedLabel = formatLabel(value);
 
@@ -203,7 +365,7 @@ export class VacuumCard extends LitElement {
             slot="trigger"
             aria-label=${ariaLabel ?? selectedLabel}
           >
-            <ha-icon icon=${icon}></ha-icon>
+            ${renderIcon ? renderIcon() : html`<ha-icon icon=${icon}></ha-icon>`}
             <span class="tip-title">${selectedLabel}</span>
             <ha-icon
               class="dropdown-trigger-arrow"
@@ -214,7 +376,12 @@ export class VacuumCard extends LitElement {
             options,
             (item) => item,
             (item) => html`
-              <ha-dropdown-item .value=${item} ?checked=${item === value}>
+              <ha-dropdown-item .value=${item} ?selected=${item === value}>
+                ${
+                  renderIcon
+                    ? html`<span slot="icon">${renderIcon(item)}</span>`
+                    : nothing
+                }
                 ${formatLabel(item)}
               </ha-dropdown-item>
             `,
@@ -222,6 +389,51 @@ export class VacuumCard extends LitElement {
         </ha-dropdown>
       </div>
     `;
+  }
+
+  private formatSelectOption(stateObj: SelectEntity, option: string): string {
+    const translated = this.hass.formatEntityState?.(stateObj, option);
+    if (translated && translated !== option) {
+      return translated;
+    }
+
+    const key = option.toLowerCase();
+    return (
+      localize(`mode.${key}`) ??
+      localize(`source.${key}`) ??
+      option.charAt(0).toUpperCase() + option.slice(1).replace(/_/g, ' ')
+    );
+  }
+
+  private renderSelect(entityId: string): Template {
+    const stateObj = this.hass.states[entityId] as SelectEntity | undefined;
+    const options = stateObj?.attributes.options;
+
+    if (!stateObj || !Array.isArray(options) || options.length === 0) {
+      return nothing;
+    }
+
+    const fallbackIcon = stateObj.attributes.icon ?? 'mdi:format-list-bulleted';
+
+    return this.renderDropdown({
+      icon: fallbackIcon,
+      value: stateObj.state,
+      options,
+      onSelect: (e) => this.handleSelectOption(entityId, e.detail.item?.value),
+      formatLabel: (value: string) => this.formatSelectOption(stateObj, value),
+      ariaLabel: String(stateObj.attributes.friendly_name ?? entityId),
+      renderIcon: (value?: string) =>
+        customElements.get('ha-state-icon')
+          ? html`<ha-state-icon
+              .stateObj=${stateObj}
+              .stateValue=${value ?? stateObj.state}
+            ></ha-state-icon>`
+          : html`<ha-icon icon=${fallbackIcon}></ha-icon>`,
+    });
+  }
+
+  private renderSelects(): Template {
+    return html`${this.selectEntityIds.map((id) => this.renderSelect(id))}`;
   }
 
   private handleVacuumAction(
@@ -346,8 +558,8 @@ export class VacuumCard extends LitElement {
   }
 
   private renderStats(state: VacuumEntityState): Template {
-    const statsList =
-      this.config.stats[state] || this.config.stats.default || [];
+    const allStats = this.stats;
+    const statsList = allStats[state] || allStats.default || [];
 
     const stats = statsList.map(
       ({ entity_id, attribute, value_template, unit, subtitle }) => {
@@ -355,26 +567,25 @@ export class VacuumCard extends LitElement {
           return nothing;
         }
 
-        let state = '';
-
-        if (entity_id && attribute) {
-          state = get(this.hass.states[entity_id].attributes, attribute);
-        } else if (attribute) {
-          state = get(this.entity.attributes, attribute);
-        } else if (entity_id) {
-          state = this.hass.states[entity_id].state;
-        } else {
+        const entity = entity_id ? this.hass.states[entity_id] : this.entity;
+        if (!entity) {
           return nothing;
         }
 
-        const value = html`
-          <ha-template
-            hass=${this.hass}
-            template=${value_template}
-            value=${state}
-            variables=${{ value: state }}
-          ></ha-template>
-        `;
+        const state = attribute
+          ? get(entity.attributes, attribute)
+          : entity.state;
+
+        const value = value_template
+          ? html`
+              <ha-template
+                .hass=${this.hass}
+                .template=${value_template}
+                .value=${state}
+                .variables=${{ value: state }}
+              ></ha-template>
+            `
+          : (state ?? '');
 
         return html`
           <div class="stats-block" @click="${() => this.handleMore(entity_id)}">
@@ -403,10 +614,45 @@ export class VacuumCard extends LitElement {
     return html` <div class="vacuum-name">${friendly_name}</div> `;
   }
 
+  private getValetudoStatus(): string | undefined {
+    const valetudo = this.valetudo;
+    if (!valetudo) {
+      return undefined;
+    }
+
+    const { state } = this.entity;
+    const error = valetudo.error ? this.hass.states[valetudo.error] : undefined;
+    if (
+      state === 'error' &&
+      error &&
+      !['No error', 'unknown', 'unavailable', ''].includes(error.state)
+    ) {
+      return error.state;
+    }
+
+    const flag = valetudo.statusFlag
+      ? this.hass.states[valetudo.statusFlag]?.state
+      : undefined;
+    if (state === 'cleaning' && flag) {
+      const flagStatus: Record<string, string> = {
+        segment: 'status.segment_cleaning',
+        zone: 'status.zoned_cleaning',
+        spot: 'status.spot',
+        target: 'status.going_to_target',
+        mapping: 'status.mapping',
+      };
+      return flagStatus[flag] ? localize(flagStatus[flag]) : undefined;
+    }
+
+    return undefined;
+  }
+
   private renderStatus(): Template {
-    const { status } = this.getAttributes(this.entity);
+    const status = String(this.getAttributes(this.entity).status ?? '');
     const localizedStatus =
-      localize(`status.${status.toLowerCase()}`) || status;
+      this.getValetudoStatus() ||
+      localize(`status.${status.toLowerCase()}`) ||
+      status;
 
     if (!this.config.show_status) {
       return nothing;
@@ -414,9 +660,11 @@ export class VacuumCard extends LitElement {
 
     return html`
       <div class="status">
-        ${this.requestInProgress
-          ? html`<ha-spinner class="status-spinner" size="tiny"></ha-spinner>`
-          : nothing}
+        ${
+          this.requestInProgress
+            ? html`<ha-spinner class="status-spinner" size="tiny"></ha-spinner>`
+            : nothing
+        }
         <span class="status-text" alt=${localizedStatus}>
           ${localizedStatus}
         </span>
@@ -438,18 +686,27 @@ export class VacuumCard extends LitElement {
       case 'cleaning': {
         return html`
           <div class="toolbar">
-            <paper-button @click="${this.handleVacuumAction('pause')}">
+            <button
+              class="toolbar-button"
+              @click="${this.handleVacuumAction('pause')}"
+            >
               <ha-icon icon="hass:pause"></ha-icon>
               ${localize('common.pause')}
-            </paper-button>
-            <paper-button @click="${this.handleVacuumAction('stop')}">
+            </button>
+            <button
+              class="toolbar-button"
+              @click="${this.handleVacuumAction('stop')}"
+            >
               <ha-icon icon="hass:stop"></ha-icon>
               ${localize('common.stop')}
-            </paper-button>
-            <paper-button @click="${this.handleVacuumAction('return_to_base')}">
+            </button>
+            <button
+              class="toolbar-button"
+              @click="${this.handleVacuumAction('return_to_base')}"
+            >
               <ha-icon icon="hass:home-map-marker"></ha-icon>
               ${localize('common.return_to_base')}
-            </paper-button>
+            </button>
           </div>
         `;
       }
@@ -457,7 +714,8 @@ export class VacuumCard extends LitElement {
       case 'paused': {
         return html`
           <div class="toolbar">
-            <paper-button
+            <button
+              class="toolbar-button"
               @click="${this.handleVacuumAction('resume', {
                 defaultService: 'start',
                 request: true,
@@ -465,11 +723,14 @@ export class VacuumCard extends LitElement {
             >
               <ha-icon icon="hass:play"></ha-icon>
               ${localize('common.continue')}
-            </paper-button>
-            <paper-button @click="${this.handleVacuumAction('return_to_base')}">
+            </button>
+            <button
+              class="toolbar-button"
+              @click="${this.handleVacuumAction('return_to_base')}"
+            >
               <ha-icon icon="hass:home-map-marker"></ha-icon>
               ${localize('common.return_to_base')}
-            </paper-button>
+            </button>
           </div>
         `;
       }
@@ -477,7 +738,8 @@ export class VacuumCard extends LitElement {
       case 'returning': {
         return html`
           <div class="toolbar">
-            <paper-button
+            <button
+              class="toolbar-button"
               @click="${this.handleVacuumAction('resume', {
                 defaultService: 'start',
                 request: true,
@@ -485,17 +747,23 @@ export class VacuumCard extends LitElement {
             >
               <ha-icon icon="hass:play"></ha-icon>
               ${localize('common.continue')}
-            </paper-button>
-            <paper-button @click="${this.handleVacuumAction('pause')}">
+            </button>
+            <button
+              class="toolbar-button"
+              @click="${this.handleVacuumAction('pause')}"
+            >
               <ha-icon icon="hass:pause"></ha-icon>
               ${localize('common.pause')}
-            </paper-button>
+            </button>
           </div>
         `;
       }
       case 'docked':
       case 'idle':
       default: {
+        const selectedRooms = this.selectedRooms.filter((id) =>
+          this.rooms.some((room) => room.id === id),
+        );
         const buttons = this.config.shortcuts.map(
           ({ name, service, icon, service_data, target }) => {
             const execute = () => {
@@ -521,11 +789,29 @@ export class VacuumCard extends LitElement {
 
         return html`
           <div class="toolbar">
-            <ha-icon-button
-              label="${localize('common.start')}"
-              @click="${this.handleVacuumAction('start')}"
-              ><ha-icon icon="hass:play"></ha-icon>
-            </ha-icon-button>
+            ${
+              selectedRooms.length
+                ? html`
+                    <button
+                      class="toolbar-button"
+                      @click="${() => this.handleCleanRooms(selectedRooms)}"
+                    >
+                      <ha-icon icon="hass:play"></ha-icon>
+                      ${localize(
+                        'common.clean_rooms',
+                        '{count}',
+                        String(selectedRooms.length),
+                      )}
+                    </button>
+                  `
+                : html`
+                    <ha-icon-button
+                      label="${localize('common.start')}"
+                      @click="${this.handleVacuumAction('start')}"
+                      ><ha-icon icon="hass:play"></ha-icon>
+                    </ha-icon-button>
+                  `
+            }
 
             <ha-icon-button
               label="${localize('common.locate')}"
@@ -542,22 +828,67 @@ export class VacuumCard extends LitElement {
     }
   }
 
+  private handleCleanRooms(segmentIds: string[]): void {
+    const valetudo = this.valetudo;
+    if (!valetudo) {
+      return;
+    }
+    cleanValetudoRooms(this.hass, valetudo, segmentIds);
+    this.selectedRooms = [];
+    this.requestInProgress = true;
+  }
+
+  private toggleRoom(id: string): void {
+    this.selectedRooms = this.selectedRooms.includes(id)
+      ? this.selectedRooms.filter((room) => room !== id)
+      : [...this.selectedRooms, id];
+  }
+
+  private renderRooms(state: VacuumEntityState): Template {
+    const rooms = this.rooms;
+    if (
+      !this.config.show_toolbar ||
+      !rooms.length ||
+      ['cleaning', 'paused', 'returning'].includes(state)
+    ) {
+      return nothing;
+    }
+
+    return html`
+      <div class="rooms">
+        ${repeat(
+          rooms,
+          (room) => room.id,
+          (room) => html`
+            <button
+              class="room ${
+                this.selectedRooms.includes(room.id) ? 'selected' : ''
+              }"
+              aria-pressed=${this.selectedRooms.includes(room.id)}
+              @click=${() => this.toggleRoom(room.id)}
+            >
+              ${room.name}
+            </button>
+          `,
+        )}
+      </div>
+    `;
+  }
+
   private renderUnavailable(): Template {
     return html`
       <ha-card>
         <div class="preview not-available">
           <div class="metadata">
-            <div class="not-available">
-              ${localize('common.not_available')}
-            </div>
-          <div>
+            <div class="not-available">${localize('common.not_available')}</div>
+          </div>
         </div>
       </ha-card>
     `;
   }
 
   protected render(): Template {
-    if (!this.entity) {
+    if (!this.config || !this.hass || !this.entity) {
       return this.renderUnavailable();
     }
 
@@ -567,7 +898,8 @@ export class VacuumCard extends LitElement {
         <div class="preview">
           <div class="header">
             <div class="tips">
-              ${this.renderSource()} ${this.renderBattery()}
+              ${this.renderSource()} ${this.renderSelects()}
+              ${this.renderBattery()}
             </div>
             <ha-icon-button
               class="more-info"
@@ -587,6 +919,7 @@ export class VacuumCard extends LitElement {
           ${this.renderStats(this.entity.state)}
         </div>
 
+        ${this.renderRooms(this.entity.state)}
         ${this.renderToolbar(this.entity.state)}
       </ha-card>
     `;

@@ -65,17 +65,9 @@
     "map": "מצלמת מפה (אפשרי)",
     "image": "תמונה (אפשרי)",
     "compact_view": "תצוגה קומפקטית",
-    "compact_view_aria_label_on": "החלף תצוגה קומפקטית",
-    "compact_view_aria_label_off": "כבה את התצוגה הקומפקטית",
     "show_name": "שם תצוגה",
-    "show_name_aria_label_on": "הפעל את שם התצוגה למצב מופעל",
-    "show_name_aria_label_off": "כבה את שם התצוגה",
     "show_status": "הצג סטטוס",
-    "show_status_aria_label_on": "הפעל את מצב התצוגה למצב פעיל",
-    "show_status_aria_label_off": "כבה את מצב התצוגה",
     "show_toolbar": "הצג סרגל כלים",
-    "show_toolbar_aria_label_on": "הפעל את סרגל הכלים לתצוגה",
-    "show_toolbar_aria_label_off": "כבה את סרגל הכלים לתצוגה",
     "code_only_note": "הערה: הגדרת פעולות ואפשרויות סטטיסטיקה זמינות אך ורק באמצעות עורך הקוד."
   }
 }

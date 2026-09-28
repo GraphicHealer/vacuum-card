@@ -65,17 +65,9 @@
     "map": "Hiển thị sơ đồ   (Tuỳ chọn)",
     "image": "Image (Tuỳ chọn)",
     "compact_view": "Thu gọn",
-    "compact_view_aria_label_on": "Xem thu gọn",
-    "compact_view_aria_label_off": "Xem mở rộng",
     "show_name": "Hiện tên",
-    "show_name_aria_label_on": "Hiện tên",
-    "show_name_aria_label_off": "Ẩn tên",
     "show_status": "Hiện trạng thái",
-    "show_status_aria_label_on": "Hiện trạng thái",
-    "show_status_aria_label_off": "Ẩn trạng thái",
     "show_toolbar": "Hiện thanh công cụ",
-    "show_toolbar_aria_label_on": "Hiện thanh công cụ",
-    "show_toolbar_aria_label_off": "Ẩn thanh công cụ",
     "code_only_note": "Lưu ý: Cài đặt thao tác và tùy chọn thống kê chỉ có sẵn bằng trình chỉnh sửa mã"
   }
 }

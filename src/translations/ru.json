@@ -65,17 +65,9 @@
     "map": "Камера для карты (Опциональное)",
     "image": "Изображение (Опциональное)",
     "compact_view": "Компактный просмотр",
-    "compact_view_aria_label_on": "Включить компактный просмотр",
-    "compact_view_aria_label_off": "Выключить компактный просмотр",
     "show_name": "Показать название?",
-    "show_name_aria_label_on": "Показать название",
-    "show_name_aria_label_off": "Скрыть название",
     "show_status": "Показать статус?",
-    "show_status_aria_label_on": "Показать статус",
-    "show_status_aria_label_off": "Скрыть статус",
     "show_toolbar": "Показать панель действий?",
-    "show_toolbar_aria_label_on": "Показать панель действий",
-    "show_toolbar_aria_label_off": "Скрыть панель действий",
     "code_only_note": "Внимание: Опции actions и stats доступны исключительно через редактор кода."
   }
 }
