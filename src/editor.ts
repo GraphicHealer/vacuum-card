@@ -8,6 +8,7 @@ import {
 import localize from './localize';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import isEqual from 'lodash/isEqual';
+import { HassServiceTarget } from 'home-assistant-js-websocket';
 import {
   ExtendedHomeAssistant,
   SelectEntity,
@@ -46,6 +47,58 @@ type ItemValue = Record<string, unknown>;
 const DETECTED_KEYS = ['battery_entity', 'selects', 'stats'] as const;
 const SELECT_DOMAINS = ['select', 'input_select'];
 const STAT_STATES = ['default', 'cleaning'];
+
+interface ShortcutForm extends ItemValue {
+  name?: string;
+  icon?: string;
+  tap_action?: {
+    action?: string;
+    perform_action?: string;
+    data?: Record<string, unknown>;
+    target?: HassServiceTarget;
+  };
+}
+
+function shortcutToForm({
+  name,
+  icon,
+  service,
+  service_data,
+  target,
+}: VacuumCardShortcut): ShortcutForm {
+  return cleanItem<ShortcutForm>({
+    name,
+    icon,
+    tap_action: service
+      ? cleanItem({
+          action: 'perform-action',
+          perform_action: service,
+          data: service_data,
+          target,
+        })
+      : undefined,
+  });
+}
+
+function shortcutFromForm({
+  name,
+  icon,
+  tap_action,
+}: ShortcutForm): VacuumCardShortcut {
+  return cleanItem<ItemValue>({
+    name,
+    icon,
+    service: tap_action?.perform_action || undefined,
+    service_data:
+      tap_action?.data && Object.keys(tap_action.data).length
+        ? tap_action.data
+        : undefined,
+    target:
+      tap_action?.target && Object.keys(tap_action.target).length
+        ? tap_action.target
+        : undefined,
+  }) as VacuumCardShortcut;
+}
 
 function roomSegment(
   { service_data }: VacuumCardShortcut,
@@ -458,9 +511,15 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     const schema: ItemSchema[] = [
       { name: 'name', selector: { text: {} } },
       { name: 'icon', selector: { icon: {} } },
-      { name: 'service', selector: { text: {} } },
-      { name: 'service_data', selector: { object: {} } },
-      { name: 'target', selector: { target: {} } },
+      {
+        name: 'tap_action',
+        selector: {
+          ui_action: {
+            actions: ['perform-action'],
+            default_action: 'perform-action',
+          },
+        },
+      },
     ];
 
     return html`
@@ -471,11 +530,11 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
             item.name || item.service || '',
             item.service ?? '',
             schema,
-            { ...item },
+            shortcutToForm(item),
             (value) =>
               this.setShortcuts(
                 items.map((old, i) =>
-                  i === index ? (value as VacuumCardShortcut) : old,
+                  i === index ? shortcutFromForm(value as ShortcutForm) : old,
                 ),
               ),
             () => this.setShortcuts(items.filter((_, i) => i !== index)),

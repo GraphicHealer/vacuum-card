@@ -60,7 +60,9 @@ This card can be configured using Lovelace UI editor.
 
 For a Valetudo vacuum, the editor writes everything it detects (battery sensor, header dropdowns and sensors) into the card config, so you can edit or remove any of it in the editor or in YAML.
 
-_Sorry, no support for `actions` in visual config yet._
+Shortcuts use Home Assistant's action picker: choose an action (e.g. `mqtt.publish`) and its fields and target are shown for you to fill in. It is saved as `service`, `service_data` and `target`.
+
+_Overriding the toolbar buttons with `actions` is only available in the code editor._
 
 Typical example of using this card in YAML config would look like this:
 
