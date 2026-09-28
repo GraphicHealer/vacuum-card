@@ -82,7 +82,7 @@ function findBySuffix(
 
 export function findValetudoEntities(
   hass: ExtendedHomeAssistant,
-  config: VacuumCardConfig,
+  config: Pick<VacuumCardConfig, 'entity' | 'valetudo'>,
 ): ValetudoEntities | null {
   if (config.valetudo === false) {
     return null;
@@ -143,6 +143,12 @@ export function findValetudoEntities(
     currentArea: find('sensor', 'current_statistics_area'),
     consumables,
   };
+}
+
+export function getValetudoSelects(
+  valetudo: ValetudoEntities | null,
+): string[] {
+  return [valetudo?.mode, valetudo?.water].filter((id): id is string => !!id);
 }
 
 export function getValetudoRooms(

@@ -7,7 +7,8 @@ import {
 } from 'custom-card-helpers';
 import localize from './localize';
 import { customElement, property, state } from 'lit/decorators.js';
-import { Template, VacuumCardConfig } from './types';
+import { ExtendedHomeAssistant, Template, VacuumCardConfig } from './types';
+import { findValetudoEntities, getValetudoSelects } from './valetudo';
 import styles from './editor.css';
 
 type EditorConfig = LovelaceCardConfig & Partial<VacuumCardConfig>;
@@ -66,7 +67,8 @@ const DEFAULTS: Partial<VacuumCardConfig> = {
 
 @customElement('vacuum-card-editor')
 export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
-  @property({ attribute: false }) public hass?: HomeAssistant;
+  @property({ attribute: false }) public hass?: HomeAssistant &
+    ExtendedHomeAssistant;
 
   @state() private config?: EditorConfig;
 
@@ -90,6 +92,18 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     fireEvent(this, 'config-changed', { config });
   }
 
+  private getDetectedSelects(): string[] {
+    if (!this.hass || !this.config?.entity) {
+      return [];
+    }
+    return getValetudoSelects(
+      findValetudoEntities(this.hass, {
+        entity: this.config.entity,
+        valetudo: this.config.valetudo ?? true,
+      }),
+    );
+  }
+
   private valueChanged(event: CustomEvent<{ value: EditorConfig }>): void {
     event.stopPropagation();
     if (!this.config) {
@@ -102,10 +116,18 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
       if (
         item === undefined ||
         item === '' ||
-        (Array.isArray(item) && item.length === 0)
+        (key !== 'selects' && Array.isArray(item) && item.length === 0)
       ) {
         delete value[key];
       }
+    }
+
+    if (
+      this.config.selects === undefined &&
+      value.entity === this.config.entity &&
+      String(value.selects) === String(this.getDetectedSelects())
+    ) {
+      delete value.selects;
     }
 
     this.updateConfig({ ...value, type: this.config.type });
@@ -123,7 +145,11 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
       <div class="card-config">
         <ha-form
           .hass=${this.hass}
-          .data=${{ ...DEFAULTS, ...this.config }}
+          .data=${{
+            ...DEFAULTS,
+            selects: this.getDetectedSelects(),
+            ...this.config,
+          }}
           .schema=${SCHEMA}
           .computeLabel=${this.computeLabel}
           @value-changed=${this.valueChanged}

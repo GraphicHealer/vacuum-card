@@ -20,7 +20,7 @@ export default function buildConfig(
   return {
     entity: config.entity,
     battery_entity: config.battery_entity ?? '',
-    selects: Array.isArray(config.selects) ? config.selects : [],
+    selects: Array.isArray(config.selects) ? config.selects : undefined,
     valetudo: config.valetudo ?? true,
     map: config.map ?? '',
     map_refresh: config.map_refresh ?? 5,

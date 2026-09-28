@@ -33,6 +33,7 @@ import {
   cleanValetudoRooms,
   findValetudoEntities,
   getValetudoRooms,
+  getValetudoSelects,
   getValetudoStats,
 } from './valetudo';
 import DEFAULT_IMAGE from './vacuum.svg';
@@ -140,12 +141,7 @@ export class VacuumCard extends LitElement {
   }
 
   get selectEntityIds(): string[] {
-    if (this.config.selects.length) {
-      return this.config.selects;
-    }
-
-    const valetudo = this.valetudo;
-    return [valetudo?.mode, valetudo?.water].filter((id): id is string => !!id);
+    return this.config.selects ?? getValetudoSelects(this.valetudo);
   }
 
   get stats(): Record<string, VacuumCardStat[]> {

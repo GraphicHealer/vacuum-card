@@ -138,7 +138,7 @@ selects:
 
 ### Valetudo
 
-Valetudo robots (MQTT autodiscovery) are detected automatically. Without extra config the card picks up the battery level, error and status-flag sensors, the `Mode` and `Water` selects, consumables and current cleaning statistics, and shows the map's rooms as chips — select rooms and press start to clean them. Anything you configure explicitly (`battery_entity`, `selects`, `stats`) takes precedence.
+Valetudo robots (MQTT autodiscovery) are detected automatically. Without extra config the card picks up the battery level, error and status-flag sensors, the `Mode` and `Water` selects, consumables and current cleaning statistics, and shows the map's rooms as chips — select rooms and press start to clean them. Anything you configure explicitly (`battery_entity`, `selects`, `stats`) takes precedence. The editor pre-fills the detected selects; remove any you don't want (an empty `selects: []` hides them all).
 
 ```yaml
 type: custom:vacuum-card

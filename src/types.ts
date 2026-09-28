@@ -71,7 +71,7 @@ export interface ValetudoConfig {
 export interface VacuumCardConfig {
   entity: string;
   battery_entity: string;
-  selects: string[];
+  selects?: string[];
   valetudo: ValetudoConfig | boolean;
   map: string;
   map_refresh: number;
