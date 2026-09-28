@@ -55,7 +55,8 @@ This card can be configured using Lovelace UI editor.
 3. Click Plus button to add a new card.
 4. Find _Custom: Vacuum Card_ in the list.
 5. Choose `entity`.
-6. Now you should see the preview of the card!
+6. Optionally pick a battery sensor, map camera and any `select` entities (e.g. cleaning mode or water level) to show next to fan speed.
+7. Now you should see the preview of the card!
 
 _Sorry, no support for `actions`, `shortcuts` and `stats` in visual config yet._
 
@@ -64,6 +65,11 @@ Typical example of using this card in YAML config would look like this:
 ```yaml
 type: 'custom:vacuum-card'
 entity: vacuum.vacuum_cleaner
+battery_entity: sensor.vacuum_cleaner_battery
+selects:
+  - select.vacuum_cleaner_mode
+  - select.vacuum_cleaner_water
+map: camera.vacuum_cleaner_map
 actions:
   start:
     service: xiaomi_miio.vacuum_clean_segment
@@ -126,7 +132,7 @@ Here is what every option means:
 
 ### Select entities
 
-Each entity in `selects` is rendered as a dropdown in the header, next to fan speed. Options are read live from the entity's `options` attribute and the icon comes from the entity itself, so any integration's modes work:
+Each entity in `selects` is rendered as a dropdown in the header, next to fan speed. Use it for things like cleaning mode (vacuum / mop / vacuum and mop), water level or mop intensity. Options are read live from the entity's `options` attribute and the icon comes from the entity itself, so any integration's options work. Picking an option calls `select.select_option` (or `input_select.select_option`).
 
 ```yaml
 type: custom:vacuum-card
@@ -136,17 +142,51 @@ selects:
   - select.robot_water
 ```
 
+- Leave `selects` out to use auto-detected selects (Valetudo only, see below).
+- List only the entities you want to show; anything not listed is hidden.
+- `selects: []` hides all select dropdowns.
+- A select whose entity doesn't exist or has no options is not shown.
+
 ### Valetudo
 
-Valetudo robots (MQTT autodiscovery) are detected automatically. Without extra config the card picks up the battery level, error and status-flag sensors, the `Mode` and `Water` selects, consumables and current cleaning statistics, and shows the map's rooms as chips — select rooms and press start to clean them. Anything you configure explicitly (`battery_entity`, `selects`, `stats`) takes precedence. The editor pre-fills the detected selects; remove any you don't want (an empty `selects: []` hides them all).
+[Valetudo][valetudo] robots connected through MQTT with Home Assistant autodiscovery are detected automatically: either the device manufacturer is `Valetudo` or the entity id starts with `vacuum.valetudo_`. The minimal config is just:
+
+```yaml
+type: custom:vacuum-card
+entity: vacuum.valetudo_robot
+```
+
+The card then uses these entities from the same device, if the robot has them:
+
+| Valetudo entity                                 | Used for                                                              | Override with    |
+| ----------------------------------------------- | --------------------------------------------------------------------- | ---------------- |
+| `sensor.*_battery_level`                        | Battery level and icon                                                | `battery_entity` |
+| `select.*_mode`, `select.*_water`               | Mode and water dropdowns next to fan speed                            | `selects`        |
+| `sensor.*_error`, `sensor.*_status_flag`        | More detailed status (e.g. _Segment cleaning_, the actual error text) | —                |
+| Consumable sensors (`mdi:progress-wrench`)      | Default stats (hours / % remaining)                                   | `stats`          |
+| `sensor.*_current_statistics_time` / `..._area` | Stats while cleaning (minutes, m²)                                    | `stats`          |
+| `sensor.*_map_segments`                         | Room chips; select rooms and press start to clean them                | `valetudo.rooms` |
+
+Anything you configure explicitly takes precedence. The visual editor pre-fills the detected selects, so you can remove the ones you don't want.
+
+Room cleaning publishes `{"segment_ids": [...], "customOrder": true}` to `<topic_prefix>/<identifier>/MapSegmentationCapability/clean/set` via `mqtt.publish`. Change `valetudo` settings only if the defaults don't fit:
 
 ```yaml
 type: custom:vacuum-card
 entity: vacuum.valetudo_robot
 valetudo:
   topic_prefix: valetudo # only if changed in Valetudo's MQTT settings
-  rooms: true
+  identifier: ShinyCoolRobot # only if it can't be read from the HA device
+  rooms: false # hide room chips
 ```
+
+| Name           |   Type    | Default                     | Description                                                |
+| -------------- | :-------: | --------------------------- | ---------------------------------------------------------- |
+| `topic_prefix` | `string`  | `valetudo`                  | MQTT topic prefix configured in Valetudo.                  |
+| `identifier`   | `string`  | From the HA device registry | Valetudo MQTT identifier (Valetudo → Connectivity → MQTT). |
+| `rooms`        | `boolean` | `true`                      | Show room chips for segment cleaning.                      |
+
+Set `valetudo: false` to turn off auto-detection completely.
 
 ### `stats` object
 
@@ -324,6 +364,7 @@ MIT © [Denys Dovhan][denysdovhan]
 
 <!-- References -->
 
+[valetudo]: https://valetudo.cloud/
 [home-assistant]: https://www.home-assistant.io/
 [hacs]: https://hacs.xyz
 [preview-image]: https://github.com/denysdovhan/vacuum-card/assets/3459374/43808d3d-65a4-4e65-9531-4f248fa8861c
