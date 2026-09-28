@@ -81,7 +81,14 @@
     "room_shortcuts_help": "Adds a shortcut for each room in {sensor}, replacing existing shortcuts for the same robot's room cleaning topic.",
     "room_shortcuts_added": "Added {count} room shortcuts.",
     "clean_room": "Clean {room}",
-    "map_rooms_prompt": "Some rooms are not mapped to areas yet. In the dialog that opened, choose \"Map vacuum segments to areas\", save, then close the dialog to generate the shortcuts."
+    "map_rooms_prompt": "Waiting for the vacuum settings window to close…",
+    "map_rooms_title": "Map rooms to areas",
+    "map_rooms_explain": "These rooms are not mapped to Home Assistant areas yet. In the next window, choose \"Map vacuum segments to areas\", pick an area for each room, save, then close the window.",
+    "map_rooms_retry_title": "Rooms not mapped",
+    "map_rooms_retry": "The locations are not mapped. Please try again.",
+    "try_again": "Try Again",
+    "cancel": "Cancel",
+    "continue": "Continue"
   },
   "mode": {
     "vacuum": "Vacuum",
