@@ -187,7 +187,7 @@ The card then uses these entities from the same device, if the robot has them:
 
 Anything you configure explicitly takes precedence. The visual editor writes the detected `battery_entity`, `selects` and `stats` into the card config, so you can change icons, names and options or remove items. Use `selects: []` or `stats: []` to show none; if a key is left out entirely, the card falls back to auto-detection.
 
-Set `valetudo: false` to use the generic detection described in [Visual editor](#visual-editor) instead.
+Set `valetudo: false` to use the generic detection described under [Usage](#usage) instead.
 
 ### Room shortcuts
 
