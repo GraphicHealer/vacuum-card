@@ -19,12 +19,11 @@ import {
   VacuumCardShortcut,
   VacuumCardStat,
   VacuumEntityRegistryEntry,
+  VacuumSegment,
 } from './types';
 import {
-  ValetudoEntities,
   findValetudoEntities,
   getValetudoDefaults,
-  getValetudoRooms,
   normalizeSelect,
 } from './valetudo';
 import styles from './editor.css';
@@ -143,22 +142,14 @@ function defaultActions(entity: string): Record<string, VacuumCardAction> {
   );
 }
 
-function roomSegment(
-  { data }: VacuumCardShortcut,
-  topic: string,
-): string | undefined {
-  if (data?.topic !== topic) {
+function roomArea({ action, data }: VacuumCardShortcut): string | undefined {
+  if (action !== 'vacuum.clean_area') {
     return undefined;
   }
-  let payload = data.payload;
-  if (typeof payload === 'string') {
-    try {
-      payload = JSON.parse(payload);
-    } catch {
-      return undefined;
-    }
+  const ids = data?.cleaning_area_id;
+  if (typeof ids === 'string') {
+    return ids;
   }
-  const ids = (payload as { segment_ids?: unknown } | undefined)?.segment_ids;
   return Array.isArray(ids) && ids.length === 1 ? String(ids[0]) : undefined;
 }
 
@@ -321,26 +312,23 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     fireEvent(this, 'config-changed', { config });
   }
 
-  private get valetudo(): ValetudoEntities | null {
-    if (!this.hass || !this.config?.entity) {
-      return null;
-    }
-    return findValetudoEntities(this.hass, {
-      entity: this.config.entity,
-      valetudo: this.config.valetudo ?? true,
-    });
+  private get supportsCleanArea(): boolean {
+    const entity = this.config?.entity;
+    const features = Number(
+      (entity && this.hass?.states[entity]?.attributes.supported_features) ?? 0,
+    );
+    return (features & CLEAN_AREA_FEATURE) !== 0;
   }
 
-  private get roomSource(): ValetudoEntities | null {
-    const valetudo = this.valetudo;
-    if (
-      !valetudo?.identifier ||
-      !valetudo.mapSegments ||
-      !this.hass?.states[valetudo.mapSegments]
-    ) {
-      return null;
+  private async getSegments(entityId: string): Promise<VacuumSegment[]> {
+    try {
+      const { segments } = await this.hass!.callWS<{
+        segments: VacuumSegment[];
+      }>({ type: 'vacuum/get_segments', entity_id: entityId });
+      return segments ?? [];
+    } catch {
+      return [];
     }
-    return valetudo;
   }
 
   private async getAreaMapping(
@@ -414,80 +402,60 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
   }
 
   private async generateRoomShortcuts(afterMapping: boolean): Promise<void> {
-    const valetudo = this.roomSource;
     const entity = this.config?.entity;
-    if (!this.hass || !this.config || !entity || !valetudo?.mapSegments) {
+    if (!this.hass || !this.config || !entity || !this.supportsCleanArea) {
       return;
     }
 
-    const sensor = valetudo.mapSegments;
-    const allRooms = getValetudoRooms(this.hass, valetudo);
-    if (!allRooms.length) {
+    const [segments, mapping] = await Promise.all([
+      this.getSegments(entity),
+      this.getAreaMapping(entity),
+    ]);
+    if (!segments.length) {
       this.roomsMessage = {
         type: 'error',
-        text: localize('error.no_rooms', '{sensor}', sensor) ?? '',
+        text: localize('error.no_rooms') ?? '',
       };
       return;
     }
 
-    const topic = `${valetudo.topicPrefix}/${valetudo.identifier}/MapSegmentationCapability/clean/set`;
+    const mapped = new Set(Object.values(mapping).flat().map(String));
+    const unmapped = segments.filter(({ id }) => !mapped.has(String(id)));
+    if (unmapped.length) {
+      this.roomsMessage = undefined;
+      this.mappingPrompt = {
+        kind: afterMapping ? 'retry' : 'explain',
+        entity,
+        rooms: unmapped.map(({ name }) => name),
+      };
+      return;
+    }
+
     const shortcuts = this.config.shortcuts ?? [];
-    const existing = new Set(shortcuts.map((item) => roomSegment(item, topic)));
-    const rooms = allRooms.filter((room) => !existing.has(room.id));
-    if (!rooms.length) {
-      this.mappingPrompt = undefined;
+    const existing = new Set(shortcuts.map(roomArea));
+    const roomShortcuts: VacuumCardShortcut[] = Object.entries(mapping)
+      .filter(([areaId, ids]) => ids.length && !existing.has(areaId))
+      .map(([areaId]) => {
+        const area = this.hass?.areas?.[areaId];
+        const name = area?.name ?? areaId;
+        return {
+          name: localize('editor.clean_room', '{room}', name) ?? name,
+          icon: area?.icon || 'mdi:texture-box',
+          action: 'vacuum.clean_area',
+          target: { entity_id: entity },
+          data: { cleaning_area_id: [areaId] },
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    this.mappingPrompt = undefined;
+    if (!roomShortcuts.length) {
       this.roomsMessage = {
         type: 'info',
         text: localize('editor.room_shortcuts_none') ?? '',
       };
       return;
     }
-
-    const areaBySegment = new Map<string, string>();
-    const mapping = await this.getAreaMapping(entity);
-    for (const [areaId, segments] of Object.entries(mapping)) {
-      for (const segment of segments) {
-        areaBySegment.set(String(segment), areaId);
-      }
-    }
-
-    const unmapped = rooms.filter((room) => !areaBySegment.has(room.id));
-    if (unmapped.length) {
-      const features = Number(
-        this.hass.states[entity]?.attributes.supported_features ?? 0,
-      );
-      if (!(features & CLEAN_AREA_FEATURE)) {
-        this.roomsMessage = {
-          type: 'error',
-          text: localize('error.area_mapping_unsupported') ?? '',
-        };
-        return;
-      }
-      this.roomsMessage = undefined;
-      this.mappingPrompt = {
-        kind: afterMapping ? 'retry' : 'explain',
-        entity,
-        rooms: unmapped.map((room) => room.name),
-      };
-      return;
-    }
-
-    const roomShortcuts: VacuumCardShortcut[] = rooms.map((room) => ({
-      name: localize('editor.clean_room', '{room}', room.name) ?? room.name,
-      action: 'mqtt.publish',
-      data: {
-        topic,
-        payload: JSON.stringify({
-          action: 'start_segment_action',
-          segment_ids: [room.id],
-          iterations: 1,
-          customOrder: true,
-        }),
-      },
-      icon:
-        this.hass?.areas?.[areaBySegment.get(room.id) ?? '']?.icon ||
-        'mdi:texture-box',
-    }));
 
     this.updateConfig({
       ...this.config,
@@ -643,8 +611,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
   }
 
   private renderRoomShortcuts(): Template {
-    const valetudo = this.roomSource;
-    if (!valetudo?.mapSegments) {
+    if (!this.supportsCleanArea) {
       return nothing;
     }
 
@@ -653,13 +620,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
         <ha-button @click=${() => this.generateRoomShortcuts(false)}>
           ${localize('editor.room_shortcuts')}
         </ha-button>
-        <span class="help">
-          ${localize(
-            'editor.room_shortcuts_help',
-            '{sensor}',
-            valetudo.mapSegments,
-          )}
-        </span>
+        <span class="help"> ${localize('editor.room_shortcuts_help')} </span>
         ${
           this.roomsMessage
             ? html`<ha-alert alert-type=${this.roomsMessage.type}>

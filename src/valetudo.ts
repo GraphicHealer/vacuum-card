@@ -3,44 +3,20 @@ import {
   VacuumCardConfig,
   VacuumCardSelect,
   VacuumCardStat,
-  ValetudoConfig,
 } from './types';
 
 export interface ValetudoEntities {
   vacuum: string;
   deviceName: string;
-  identifier?: string;
-  topicPrefix: string;
   battery?: string;
   error?: string;
   statusFlag?: string;
-  mapSegments?: string;
   water?: string;
   mode?: string;
   currentTime?: string;
   currentArea?: string;
   consumables: string[];
 }
-
-export interface ValetudoRoom {
-  id: string;
-  name: string;
-}
-
-const DEFAULT_TOPIC_PREFIX = 'valetudo';
-
-const NON_SEGMENT_ATTRIBUTES = new Set([
-  'friendly_name',
-  'icon',
-  'entity_picture',
-  'unit_of_measurement',
-  'device_class',
-  'state_class',
-  'attribution',
-  'restored',
-  'supported_features',
-  'assumed_state',
-]);
 
 const CONSUMABLE_PATTERN =
   /(brush|filter|sensor|cleaning|mop|detergent|bin|wheel|dock)$/;
@@ -90,13 +66,10 @@ export function findValetudoEntities(
   }
 
   const vacuumId = config.entity;
-  const overrides: ValetudoConfig =
-    typeof config.valetudo === 'object' ? config.valetudo : {};
   const deviceId = hass.entities?.[vacuumId]?.device_id;
   const device = deviceId ? hass.devices?.[deviceId] : undefined;
 
   const isValetudo =
-    typeof config.valetudo === 'object' ||
     device?.manufacturer === 'Valetudo' ||
     vacuumId.startsWith('vacuum.valetudo_');
 
@@ -130,14 +103,9 @@ export function findValetudoEntities(
   return {
     vacuum: vacuumId,
     deviceName: device?.name_by_user ?? device?.name ?? '',
-    identifier:
-      overrides.identifier ??
-      device?.identifiers?.find(([domain]) => domain === 'mqtt')?.[1],
-    topicPrefix: overrides.topic_prefix ?? DEFAULT_TOPIC_PREFIX,
     battery: find('sensor', 'battery_level'),
     error: find('sensor', 'error'),
     statusFlag: find('sensor', 'status_flag'),
-    mapSegments: find('sensor', 'map_segments'),
     water: find('select', 'water'),
     mode: find('select', 'mode'),
     currentTime: find('sensor', 'current_statistics_time'),
@@ -156,34 +124,6 @@ export function normalizeSelect(
   item: string | VacuumCardSelect,
 ): VacuumCardSelect {
   return typeof item === 'string' ? { entity: item } : item;
-}
-
-export function getValetudoRooms(
-  hass: ExtendedHomeAssistant,
-  valetudo: ValetudoEntities,
-): ValetudoRoom[] {
-  const sensor = valetudo.mapSegments
-    ? hass.states[valetudo.mapSegments]?.attributes
-    : undefined;
-  const vacuumSegments = hass.states[valetudo.vacuum]?.attributes.segments;
-  const segments =
-    sensor ??
-    (vacuumSegments && typeof vacuumSegments === 'object'
-      ? (vacuumSegments as Record<string, unknown>)
-      : undefined);
-
-  if (!segments) {
-    return [];
-  }
-
-  return Object.entries(segments)
-    .filter(
-      ([id, name]) =>
-        !NON_SEGMENT_ATTRIBUTES.has(id) &&
-        (typeof name === 'string' || typeof name === 'number'),
-    )
-    .map(([id, name]) => ({ id, name: String(name) }))
-    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function stripDeviceName(
