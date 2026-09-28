@@ -78,7 +78,7 @@
     "selects": "Header Dropdowns",
     "map_refresh": "Map Refresh Interval (Seconds)",
     "room_shortcuts": "Generate Room Shortcuts",
-    "room_shortcuts_help": "Adds a shortcut for each room in {sensor}, replacing existing shortcuts for the same robot's room cleaning topic.",
+    "room_shortcuts_help": "Adds a shortcut for each room in {sensor} that doesn't have one yet.",
     "room_shortcuts_added": "Added {count} room shortcuts.",
     "clean_room": "Clean {room}",
     "map_rooms_prompt": "Waiting for the vacuum settings window to close…",
@@ -101,7 +101,14 @@
     "item_subtitle": "Name",
     "item_unit": "Unit",
     "item_value_template": "Value template",
-    "item_name": "Name"
+    "item_name": "Name",
+    "room_shortcuts_none": "Every room already has a shortcut.",
+    "shortcuts": "Shortcuts",
+    "shortcut_add": "Add shortcut",
+    "new_shortcut": "New shortcut",
+    "item_service": "Action (e.g. mqtt.publish)",
+    "item_service_data": "Action data",
+    "item_target": "Target"
   },
   "mode": {
     "vacuum": "Vacuum",
