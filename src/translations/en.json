@@ -53,12 +53,14 @@
     "stop": "Stop",
     "return_to_base": "Dock",
     "locate": "Locate Vacuum",
-    "not_available": "Vacuum is not available",
-    "clean_rooms": "Clean {count} rooms"
+    "not_available": "Vacuum is not available"
   },
   "error": {
     "invalid_config": "Invalid configuration",
-    "missing_entity": "Specifying entity is required!"
+    "missing_entity": "Specifying entity is required!",
+    "rooms_not_mapped": "These rooms are not mapped to Home Assistant areas: {rooms}. Map the vacuum's segments to areas in its entity settings, then try again.",
+    "no_rooms": "No rooms found in {sensor}.",
+    "area_mapping_unsupported": "This vacuum doesn't support Home Assistant's segment-to-area mapping, so room icons can't be looked up. Update Valetudo and Home Assistant, then try again."
   },
   "warning": {
     "actions_array": "WARNING: 'actions' is reserved to override default actions for existing buttons. If your intention was to add additional actions, use the 'shortcuts' option instead."
@@ -74,7 +76,19 @@
     "show_toolbar": "Show Toolbar",
     "code_only_note": "Note: Setting actions and stats options are available exclusively using Code Editor.",
     "selects": "Select Entities (Optional)",
-    "map_refresh": "Map Refresh Interval (Seconds)"
+    "map_refresh": "Map Refresh Interval (Seconds)",
+    "room_shortcuts": "Generate Room Shortcuts",
+    "room_shortcuts_help": "Adds a shortcut for each room in {sensor}, replacing existing shortcuts for the same robot's room cleaning topic.",
+    "room_shortcuts_added": "Added {count} room shortcuts.",
+    "clean_room": "Clean {room}",
+    "map_rooms_prompt": "Waiting for the vacuum settings window to close…",
+    "map_rooms_title": "Map rooms to areas",
+    "map_rooms_explain": "These rooms are not mapped to Home Assistant areas yet. In the next window, choose \"Map vacuum segments to areas\", pick an area for each room, save, then close the window.",
+    "map_rooms_retry_title": "Rooms not mapped",
+    "map_rooms_retry": "The locations are not mapped. Please try again.",
+    "try_again": "Try Again",
+    "cancel": "Cancel",
+    "continue": "Continue"
   },
   "mode": {
     "vacuum": "Vacuum",

@@ -128,7 +128,7 @@ Here is what every option means:
 | `stats`          |       `object`       | Optional     | Custom per state stats for your vacuum cleaner                                                            |
 | `actions`        |       `object`       | Optional     | Override default actions behavior with service invocations.                                               |
 | `shortcuts`      |       `array`        | Optional     | List of shortcuts shown at the right bottom part of the card with custom actions for your vacuum cleaner. |
-| `valetudo`       | `boolean` / `object` | `true`       | Valetudo auto-detection. Set `false` to disable, or an object with `topic_prefix`, `identifier`, `rooms`. |
+| `valetudo`       | `boolean` / `object` | `true`       | Valetudo auto-detection. Set `false` to disable, or an object with `topic_prefix`, `identifier`.          |
 
 ### Select entities
 
@@ -165,11 +165,11 @@ The card then uses these entities from the same device, if the robot has them:
 | `sensor.*_error`, `sensor.*_status_flag`        | More detailed status (e.g. _Segment cleaning_, the actual error text) | —                |
 | Consumable sensors (`mdi:progress-wrench`)      | Default stats (hours / % remaining)                                   | `stats`          |
 | `sensor.*_current_statistics_time` / `..._area` | Stats while cleaning (minutes, m²)                                    | `stats`          |
-| `sensor.*_map_segments`                         | Room chips; select rooms and press start to clean them                | `valetudo.rooms` |
+| `sensor.*_map_segments`                         | Rooms for the [room shortcuts](#room-shortcuts) button in the editor  | —                |
 
 Anything you configure explicitly takes precedence. The visual editor pre-fills the detected selects, so you can remove the ones you don't want.
 
-Room cleaning publishes `{"segment_ids": [...], "customOrder": true}` to `<topic_prefix>/<identifier>/MapSegmentationCapability/clean/set` via `mqtt.publish`. Change `valetudo` settings only if the defaults don't fit:
+Change `valetudo` settings only if the defaults don't fit:
 
 ```yaml
 type: custom:vacuum-card
@@ -177,16 +177,31 @@ entity: vacuum.valetudo_robot
 valetudo:
   topic_prefix: valetudo # only if changed in Valetudo's MQTT settings
   identifier: ShinyCoolRobot # only if it can't be read from the HA device
-  rooms: false # hide room chips
 ```
 
-| Name           |   Type    | Default                     | Description                                                |
-| -------------- | :-------: | --------------------------- | ---------------------------------------------------------- |
-| `topic_prefix` | `string`  | `valetudo`                  | MQTT topic prefix configured in Valetudo.                  |
-| `identifier`   | `string`  | From the HA device registry | Valetudo MQTT identifier (Valetudo → Connectivity → MQTT). |
-| `rooms`        | `boolean` | `true`                      | Show room chips for segment cleaning.                      |
+| Name           |   Type   | Default                     | Description                                                |
+| -------------- | :------: | --------------------------- | ---------------------------------------------------------- |
+| `topic_prefix` | `string` | `valetudo`                  | MQTT topic prefix configured in Valetudo.                  |
+| `identifier`   | `string` | From the HA device registry | Valetudo MQTT identifier (Valetudo → Connectivity → MQTT). |
 
 Set `valetudo: false` to turn off auto-detection completely.
+
+#### Room shortcuts
+
+For a Valetudo vacuum with a `sensor.*_map_segments` sensor, the visual editor shows a **Generate Room Shortcuts** button. It adds one [shortcut](#shortcuts-object) per room, named after the room in Valetudo and using the icon of the Home Assistant area the room is mapped to. If any room isn't mapped to an area yet, a pop-up lists those rooms and explains how to map them. **Continue** opens the vacuum's settings, where you pick **Map vacuum segments to areas** and save. When you close the settings, the editor checks the mapping again: if everything is mapped the shortcuts are generated, otherwise a _"The locations are not mapped. Please try again."_ pop-up offers **Try Again** (reopens the settings) or **Cancel**. Existing shortcuts that publish to the same room-cleaning topic (e.g. ones generated earlier or written by hand) are replaced; all other shortcuts are kept.
+
+Each generated shortcut looks like this:
+
+```yaml
+shortcuts:
+  - name: Clean Living Room
+    service: mqtt.publish
+    service_data:
+      topic: valetudo/ShinyCoolRobot/MapSegmentationCapability/clean/set
+      payload: >-
+        {"action":"start_segment_action","segment_ids":["7"],"iterations":1,"customOrder":true}
+    icon: mdi:sofa
+```
 
 ### `stats` object
 

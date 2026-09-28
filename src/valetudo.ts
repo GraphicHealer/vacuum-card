@@ -179,21 +179,6 @@ export function getValetudoRooms(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function cleanValetudoRooms(
-  hass: ExtendedHomeAssistant,
-  valetudo: ValetudoEntities,
-  segmentIds: string[],
-): void {
-  if (!valetudo.identifier || !segmentIds.length) {
-    return;
-  }
-
-  hass.callService('mqtt', 'publish', {
-    topic: `${valetudo.topicPrefix}/${valetudo.identifier}/MapSegmentationCapability/clean/set`,
-    payload: JSON.stringify({ segment_ids: segmentIds, customOrder: true }),
-  });
-}
-
 function stripDeviceName(
   hass: ExtendedHomeAssistant,
   entityId: string,

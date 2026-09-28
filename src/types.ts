@@ -65,7 +65,6 @@ export interface VacuumCardShortcut {
 export interface ValetudoConfig {
   topic_prefix?: string;
   identifier?: string;
-  rooms?: boolean;
 }
 
 export interface VacuumCardConfig {
@@ -108,9 +107,24 @@ export interface DeviceRegistryEntry {
   name_by_user: string | null;
 }
 
+export interface AreaRegistryEntry {
+  area_id: string;
+  name: string;
+  icon: string | null;
+}
+
+export interface VacuumEntityRegistryEntry {
+  options?: {
+    vacuum?: {
+      area_mapping?: Record<string, string[]>;
+    };
+  };
+}
+
 export interface ExtendedHomeAssistant extends HomeAssistant {
   entities?: Record<string, EntityRegistryDisplayEntry>;
   devices?: Record<string, DeviceRegistryEntry>;
+  areas?: Record<string, AreaRegistryEntry>;
   formatEntityState?: (stateObj: HassEntity, state?: string) => string;
 }
 

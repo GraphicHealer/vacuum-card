@@ -315,28 +315,3 @@ ha-icon {
   color: var(--vc-toolbar-icon-color);
   display: flex;
 }
-
-.rooms {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: center;
-  padding: 0 var(--vc-spacing) var(--vc-spacing);
-}
-
-.room {
-  background: none;
-  border: 1px solid var(--vc-divider-color);
-  border-radius: 16px;
-  color: var(--vc-secondary-text-color);
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  padding: 4px 12px;
-
-  &.selected {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
-    color: var(--text-primary-color, #fff);
-  }
-}

@@ -29,10 +29,7 @@ import {
 } from './types';
 import {
   ValetudoEntities,
-  ValetudoRoom,
-  cleanValetudoRooms,
   findValetudoEntities,
-  getValetudoRooms,
   getValetudoSelects,
   getValetudoStats,
 } from './valetudo';
@@ -62,7 +59,6 @@ export class VacuumCard extends LitElement {
 
   @state() private config!: VacuumCardConfig;
   @state() private requestInProgress = false;
-  @state() private selectedRooms: string[] = [];
 
   private thumbUpdater: ReturnType<typeof setInterval> | null = null;
   private valetudoCache: {
@@ -155,18 +151,6 @@ export class VacuumCard extends LitElement {
     });
   }
 
-  get rooms(): ValetudoRoom[] {
-    const valetudo = this.valetudo;
-    if (
-      !valetudo?.identifier ||
-      (typeof this.config.valetudo === 'object' &&
-        this.config.valetudo.rooms === false)
-    ) {
-      return [];
-    }
-    return getValetudoRooms(this.hass, valetudo);
-  }
-
   private findDeviceBatteryEntity(): string | undefined {
     const deviceId = this.hass.entities?.[this.config.entity]?.device_id;
     if (!deviceId || !this.hass.entities) {
@@ -195,13 +179,11 @@ export class VacuumCard extends LitElement {
       ...statEntities,
       valetudo?.error,
       valetudo?.statusFlag,
-      valetudo?.mapSegments,
     ].filter((id): id is string => !!id);
   }
 
   public setConfig(config: VacuumCardConfig): void {
     this.config = buildConfig(config);
-    this.selectedRooms = [];
     if (this.isConnected) {
       this.startMapRefresh();
     }
@@ -761,9 +743,6 @@ export class VacuumCard extends LitElement {
       case 'docked':
       case 'idle':
       default: {
-        const selectedRooms = this.selectedRooms.filter((id) =>
-          this.rooms.some((room) => room.id === id),
-        );
         const buttons = this.config.shortcuts.map(
           ({ name, service, icon, service_data, target }) => {
             const execute = () => {
@@ -789,29 +768,11 @@ export class VacuumCard extends LitElement {
 
         return html`
           <div class="toolbar">
-            ${
-              selectedRooms.length
-                ? html`
-                    <button
-                      class="toolbar-button"
-                      @click="${() => this.handleCleanRooms(selectedRooms)}"
-                    >
-                      <ha-icon icon="hass:play"></ha-icon>
-                      ${localize(
-                        'common.clean_rooms',
-                        '{count}',
-                        String(selectedRooms.length),
-                      )}
-                    </button>
-                  `
-                : html`
-                    <ha-icon-button
-                      label="${localize('common.start')}"
-                      @click="${this.handleVacuumAction('start')}"
-                      ><ha-icon icon="hass:play"></ha-icon>
-                    </ha-icon-button>
-                  `
-            }
+            <ha-icon-button
+              label="${localize('common.start')}"
+              @click="${this.handleVacuumAction('start')}"
+              ><ha-icon icon="hass:play"></ha-icon>
+            </ha-icon-button>
 
             <ha-icon-button
               label="${localize('common.locate')}"
@@ -826,53 +787,6 @@ export class VacuumCard extends LitElement {
         `;
       }
     }
-  }
-
-  private handleCleanRooms(segmentIds: string[]): void {
-    const valetudo = this.valetudo;
-    if (!valetudo) {
-      return;
-    }
-    cleanValetudoRooms(this.hass, valetudo, segmentIds);
-    this.selectedRooms = [];
-    this.requestInProgress = true;
-  }
-
-  private toggleRoom(id: string): void {
-    this.selectedRooms = this.selectedRooms.includes(id)
-      ? this.selectedRooms.filter((room) => room !== id)
-      : [...this.selectedRooms, id];
-  }
-
-  private renderRooms(state: VacuumEntityState): Template {
-    const rooms = this.rooms;
-    if (
-      !this.config.show_toolbar ||
-      !rooms.length ||
-      ['cleaning', 'paused', 'returning'].includes(state)
-    ) {
-      return nothing;
-    }
-
-    return html`
-      <div class="rooms">
-        ${repeat(
-          rooms,
-          (room) => room.id,
-          (room) => html`
-            <button
-              class="room ${
-                this.selectedRooms.includes(room.id) ? 'selected' : ''
-              }"
-              aria-pressed=${this.selectedRooms.includes(room.id)}
-              @click=${() => this.toggleRoom(room.id)}
-            >
-              ${room.name}
-            </button>
-          `,
-        )}
-      </div>
-    `;
   }
 
   private renderUnavailable(): Template {
@@ -919,7 +833,6 @@ export class VacuumCard extends LitElement {
           ${this.renderStats(this.entity.state)}
         </div>
 
-        ${this.renderRooms(this.entity.state)}
         ${this.renderToolbar(this.entity.state)}
       </ha-card>
     `;
