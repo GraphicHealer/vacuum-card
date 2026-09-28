@@ -60,7 +60,9 @@ This card can be configured using Lovelace UI editor.
 
 For a Valetudo vacuum, the editor writes everything it detects (battery sensor, header dropdowns and sensors) into the card config, so you can edit or remove any of it in the editor or in YAML.
 
-_Sorry, no support for `actions` in visual config yet._
+Shortcuts use Home Assistant's action picker: choose an action (e.g. `mqtt.publish`) and its fields and target are shown for you to fill in. It is saved in the same `action` / `data` / `target` format as automations.
+
+The collapsible **Toolbar Actions** section sets what the main buttons (start, pause, resume, stop, locate, return to base) do. The editor fills each one with its standard vacuum action (e.g. `vacuum.start` targeting your vacuum), so you can change it with the same action picker. A button whose action is cleared falls back to the standard vacuum action.
 
 Typical example of using this card in YAML config would look like this:
 
@@ -74,8 +76,8 @@ selects:
 map: camera.vacuum_cleaner_map
 actions:
   start:
-    service: xiaomi_miio.vacuum_clean_segment
-    service_data:
+    action: xiaomi_miio.vacuum_clean_segment
+    data:
       entity_id: vacuum.vacuum_cleaner
       segments: [16, 20]
 stats:
@@ -102,35 +104,35 @@ stats:
       subtitle: Cleaning time
 shortcuts:
   - name: Clean living room
-    service: script.clean_living_room
+    action: script.clean_living_room
     icon: 'mdi:sofa'
   - name: Clean bedroom
-    service: script.clean_bedroom
+    action: script.clean_bedroom
     icon: 'mdi:bed-empty'
   - name: Clean kitchen
-    service: script.clean_kitchen
+    action: script.clean_kitchen
     icon: 'mdi:silverware-fork-knife'
 ```
 
 Here is what every option means:
 
-| Name             |         Type         | Default      | Description                                                                                               |
-| ---------------- | :------------------: | ------------ | --------------------------------------------------------------------------------------------------------- |
-| `type`           |       `string`       | **Required** | `custom:vacuum-card`                                                                                      |
-| `entity`         |       `string`       | **Required** | An entity_id within the `vacuum` domain.                                                                  |
-| `battery_entity` |       `string`       | Optional     | An entity_id within the `sensor` domain to display battery state and icon.                                |
-| `selects`        |       `array`        | Optional     | [Header dropdowns](#header-dropdowns-selects) next to fan speed (e.g. cleaning mode, water).              |
-| `map`            |       `string`       | Optional     | An entity_id within the `camera` or `image` domain, for streaming live vacuum map.                        |
-| `map_refresh`    |      `integer`       | `5`          | Update interval for map camera in seconds                                                                 |
-| `image`          |       `string`       | `default`    | Path to image of your vacuum cleaner. Better to have `png` or `svg`.                                      |
-| `show_name`      |      `boolean`       | `true`       | Show friendly name of the vacuum.                                                                         |
-| `show_status`    |      `boolean`       | `true`       | Show status of the vacuum.                                                                                |
-| `show_toolbar`   |      `boolean`       | `true`       | Show toolbar with actions.                                                                                |
-| `compact_view`   |      `boolean`       | `false`      | Compact view without image.                                                                               |
-| `stats`          |       `object`       | Optional     | Custom per state stats for your vacuum cleaner                                                            |
-| `actions`        |       `object`       | Optional     | Override default actions behavior with service invocations.                                               |
-| `shortcuts`      |       `array`        | Optional     | List of shortcuts shown at the right bottom part of the card with custom actions for your vacuum cleaner. |
-| `valetudo`       | `boolean` / `object` | `true`       | Valetudo auto-detection. Set `false` to disable, or an object with `topic_prefix`, `identifier`.          |
+| Name             |   Type    | Default      | Description                                                                                               |
+| ---------------- | :-------: | ------------ | --------------------------------------------------------------------------------------------------------- |
+| `type`           | `string`  | **Required** | `custom:vacuum-card`                                                                                      |
+| `entity`         | `string`  | **Required** | An entity_id within the `vacuum` domain.                                                                  |
+| `battery_entity` | `string`  | Optional     | An entity_id within the `sensor` domain to display battery state and icon.                                |
+| `selects`        |  `array`  | Optional     | [Header dropdowns](#header-dropdowns-selects) next to fan speed (e.g. cleaning mode, water).              |
+| `map`            | `string`  | Optional     | An entity_id within the `camera` or `image` domain, for streaming live vacuum map.                        |
+| `map_refresh`    | `integer` | `5`          | Update interval for map camera in seconds                                                                 |
+| `image`          | `string`  | `default`    | Path to image of your vacuum cleaner. Better to have `png` or `svg`.                                      |
+| `show_name`      | `boolean` | `true`       | Show friendly name of the vacuum.                                                                         |
+| `show_status`    | `boolean` | `true`       | Show status of the vacuum.                                                                                |
+| `show_toolbar`   | `boolean` | `true`       | Show toolbar with actions.                                                                                |
+| `compact_view`   | `boolean` | `false`      | Compact view without image.                                                                               |
+| `stats`          | `object`  | Optional     | Custom per state stats for your vacuum cleaner                                                            |
+| `actions`        | `object`  | Optional     | Override default actions behavior with service invocations.                                               |
+| `shortcuts`      |  `array`  | Optional     | List of shortcuts shown at the right bottom part of the card with custom actions for your vacuum cleaner. |
+| `valetudo`       | `boolean` | `true`       | Valetudo auto-detection. Set `false` to disable.                                                          |
 
 ### Header dropdowns (`selects`)
 
@@ -180,42 +182,31 @@ The card then uses these entities from the same device, if the robot has them:
 | `sensor.*_error`, `sensor.*_status_flag`        | More detailed status (e.g. _Segment cleaning_, the actual error text) | —                |
 | Consumable sensors (`mdi:progress-wrench`)      | Default stats (hours / % remaining)                                   | `stats`          |
 | `sensor.*_current_statistics_time` / `..._area` | Stats while cleaning (minutes, m²)                                    | `stats`          |
-| `sensor.*_map_segments`                         | Rooms for the [room shortcuts](#room-shortcuts) button in the editor  | —                |
 
 Anything you configure explicitly takes precedence. The visual editor writes the detected `battery_entity`, `selects` and `stats` into the card config, so you can change icons, names and options or remove items. Use `selects: []` or `stats: {}` to show none; if a key is left out entirely, the card falls back to auto-detection.
 
-Change `valetudo` settings only if the defaults don't fit:
-
-```yaml
-type: custom:vacuum-card
-entity: vacuum.valetudo_robot
-valetudo:
-  topic_prefix: valetudo # only if changed in Valetudo's MQTT settings
-  identifier: ShinyCoolRobot # only if it can't be read from the HA device
-```
-
-| Name           |   Type   | Default                     | Description                                                |
-| -------------- | :------: | --------------------------- | ---------------------------------------------------------- |
-| `topic_prefix` | `string` | `valetudo`                  | MQTT topic prefix configured in Valetudo.                  |
-| `identifier`   | `string` | From the HA device registry | Valetudo MQTT identifier (Valetudo → Connectivity → MQTT). |
-
 Set `valetudo: false` to turn off auto-detection completely.
 
-#### Room shortcuts
+### Room shortcuts
 
-For a Valetudo vacuum with a `sensor.*_map_segments` sensor, the visual editor shows a **Generate Room Shortcuts** button. It adds one [shortcut](#shortcuts-object) per room, named after the room in Valetudo and using the icon of the Home Assistant area the room is mapped to. If any room isn't mapped to an area yet, a pop-up lists those rooms and explains how to map them. **Continue** opens the vacuum's settings, where you pick **Map vacuum segments to areas** and save. When you close the settings, the editor checks the mapping again: if everything is mapped the shortcuts are generated, otherwise a _"The locations are not mapped. Please try again."_ pop-up offers **Try Again** (reopens the settings) or **Cancel**. The button sits below the **Shortcuts** list. Rooms that already have a shortcut (one publishing to the same room-cleaning topic with that room's segment id, whether generated earlier or written by hand) are skipped, so clicking it again only adds new rooms and never duplicates or changes existing shortcuts.
+For any vacuum that supports Home Assistant's area cleaning (`vacuum.clean_area`), including Valetudo, the visual editor shows a **Generate Room Shortcuts** button below the **Shortcuts** list. It adds one [shortcut](#shortcuts-object) per Home Assistant area the vacuum's segments are mapped to, named and iconed after that area.
+
+If any segment isn't mapped to an area yet, a pop-up lists them and explains how to map them. **Continue** opens the vacuum's settings, where you pick **Map vacuum segments to areas** and save. When you close the settings, the editor checks the mapping again: if everything is mapped the shortcuts are generated, otherwise a _"The locations are not mapped. Please try again."_ pop-up offers **Try Again** (reopens the settings) or **Cancel**.
+
+Areas that already have a shortcut (a `vacuum.clean_area` shortcut for just that area, whether generated earlier or written by hand) are skipped, so clicking it again only adds new areas and never duplicates or changes existing shortcuts.
 
 Each generated shortcut looks like this:
 
 ```yaml
 shortcuts:
   - name: Clean Living Room
-    service: mqtt.publish
-    service_data:
-      topic: valetudo/ShinyCoolRobot/MapSegmentationCapability/clean/set
-      payload: >-
-        {"action":"start_segment_action","segment_ids":["7"],"iterations":1,"customOrder":true}
     icon: mdi:sofa
+    action: vacuum.clean_area
+    target:
+      entity_id: vacuum.robot
+    data:
+      cleaning_area_id:
+        - living_room
 ```
 
 ### `stats` object
@@ -233,24 +224,33 @@ You can use any attribute of vacuum or even any entity by `entity_id` to display
 
 ### `actions` object
 
-You can defined service invocations to override default actions behavior. Available actions to override are `start`, `pause`, `resume`, `stop`, `locate` and `return_to_base`.
+You can define action calls to override default actions behavior. Available actions to override are `start`, `pause`, `resume`, `stop`, `locate` and `return_to_base`. They use the same `action` / `data` / `target` format as automations, and the visual editor pre-fills them with the standard vacuum actions:
 
-| Name           |   Type   | Default  | Description                                     |
-| -------------- | :------: | -------- | ----------------------------------------------- |
-| `service`      | `string` | Optional | A service to call, i.e. `script.clean_bedroom`. |
-| `service_data` | `object` | Optional | `service_data` for `service` call               |
+```yaml
+actions:
+  start:
+    action: vacuum.start
+    target:
+      entity_id: vacuum.robot
+```
+
+| Name     |   Type   | Default      | Description                                                    |
+| -------- | :------: | ------------ | -------------------------------------------------------------- |
+| `action` | `string` | **Required** | An action to call, i.e. `script.clean_bedroom`.                |
+| `data`   | `object` | Optional     | Data for the action call.                                      |
+| `target` | `object` | Optional     | A `HassServiceTarget`, to define a target for the action call. |
 
 ### `shortcuts` object
 
 You can defined [custom scripts][ha-scripts] for custom actions i.e cleaning specific room and add them to this card with `shortcuts` option.
 
-| Name           |   Type   | Default  | Description                                                             |
-| -------------- | :------: | -------- | ----------------------------------------------------------------------- |
-| `name`         | `string` | Optional | Friendly name of the action, i.e. `Clean bedroom`.                      |
-| `service`      | `string` | Optional | A service to call, i.e. `script.clean_bedroom`.                         |
-| `target`       | `object` | Optional | A `HassServiceTarget`, to define a target for the current service call. |
-| `icon`         | `string` | Optional | Any icon for action button.                                             |
-| `service_data` | `object` | Optional | `service_data` for `service` call                                       |
+| Name     |   Type   | Default  | Description                                                    |
+| -------- | :------: | -------- | -------------------------------------------------------------- |
+| `name`   | `string` | Optional | Friendly name of the action, i.e. `Clean bedroom`.             |
+| `action` | `string` | Optional | An action to call, i.e. `script.clean_bedroom`.                |
+| `data`   | `object` | Optional | Data for the action call.                                      |
+| `target` | `object` | Optional | A `HassServiceTarget`, to define a target for the action call. |
+| `icon`   | `string` | Optional | Any icon for action button.                                    |
 
 ## Theming
 

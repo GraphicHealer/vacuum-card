@@ -57,29 +57,24 @@ export interface VacuumCardSelect {
 }
 
 export interface VacuumCardAction {
-  service: string;
-  service_data?: Record<string, unknown>;
+  action: string;
+  data?: Record<string, unknown>;
   target?: HassServiceTarget;
 }
 
 export interface VacuumCardShortcut {
   name?: string;
   icon?: string;
-  service?: string;
-  service_data?: Record<string, unknown>;
+  action?: string;
+  data?: Record<string, unknown>;
   target?: HassServiceTarget;
-}
-
-export interface ValetudoConfig {
-  topic_prefix?: string;
-  identifier?: string;
 }
 
 export interface VacuumCardConfig {
   entity: string;
   battery_entity: string;
   selects?: (string | VacuumCardSelect)[];
-  valetudo: ValetudoConfig | boolean;
+  valetudo: boolean;
   map: string;
   map_refresh: number;
   image: string;
@@ -119,6 +114,12 @@ export interface AreaRegistryEntry {
   area_id: string;
   name: string;
   icon: string | null;
+}
+
+export interface VacuumSegment {
+  id: string;
+  name: string;
+  group: string | null;
 }
 
 export interface VacuumEntityRegistryEntry {

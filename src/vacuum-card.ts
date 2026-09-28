@@ -278,10 +278,9 @@ export class VacuumCard extends LitElement {
     );
   }
 
-  private callService(action: VacuumCardAction) {
-    const { service, service_data, target } = action;
-    const [domain, name] = service.split('.');
-    this.hass.callService(domain, name, service_data, target);
+  private callService({ action, data, target }: VacuumCardAction) {
+    const [domain, name] = action.split('.');
+    this.hass.callService(domain, name, data, target);
   }
 
   private callVacuumService(
@@ -441,6 +440,10 @@ export class VacuumCard extends LitElement {
       }
 
       this.callService(this.config.actions[action]);
+      if (params.request) {
+        this.requestInProgress = true;
+        this.requestUpdate();
+      }
     };
   }
 
@@ -764,10 +767,10 @@ export class VacuumCard extends LitElement {
       case 'idle':
       default: {
         const buttons = this.config.shortcuts.map(
-          ({ name, service, icon, service_data, target }) => {
+          ({ name, action, icon, data, target }) => {
             const execute = () => {
-              if (service) {
-                return this.callService({ service, service_data, target });
+              if (action) {
+                return this.callService({ action, data, target });
               }
             };
             return html`
