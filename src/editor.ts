@@ -76,16 +76,28 @@ const DEFAULTS: Partial<VacuumCardConfig> = {
   map_refresh: 5,
 };
 
+const CLEAN_AREA_FEATURE = 16384;
+
 @customElement('vacuum-card-editor')
 export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
   @property({ attribute: false }) public hass?: HomeAssistant &
     ExtendedHomeAssistant;
 
   @state() private config?: EditorConfig;
-  @state() private roomsMessage?: { type: 'error' | 'success'; text: string };
+  @state() private roomsMessage?: {
+    type: 'error' | 'info' | 'success';
+    text: string;
+  };
+
+  private mappingDialogListener?: (event: Event) => void;
 
   setConfig(config: EditorConfig): void {
     this.config = { ...config };
+  }
+
+  public disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.stopWaitingForMapping();
   }
 
   protected updated(): void {
@@ -144,7 +156,38 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     }
   }
 
-  private async generateRoomShortcuts(): Promise<void> {
+  private stopWaitingForMapping(): void {
+    if (this.mappingDialogListener) {
+      window.removeEventListener('dialog-closed', this.mappingDialogListener);
+      this.mappingDialogListener = undefined;
+    }
+  }
+
+  private openAreaMapping(entityId: string): void {
+    this.stopWaitingForMapping();
+    this.mappingDialogListener = (event: Event) => {
+      const { dialog } = (event as CustomEvent<{ dialog?: string }>).detail;
+      if (dialog === 'ha-more-info-dialog') {
+        this.stopWaitingForMapping();
+        this.generateRoomShortcuts(false);
+      }
+    };
+    window.addEventListener('dialog-closed', this.mappingDialogListener);
+
+    this.roomsMessage = {
+      type: 'info',
+      text: localize('editor.map_rooms_prompt') ?? '',
+    };
+    this.dispatchEvent(
+      new CustomEvent('hass-more-info', {
+        detail: { entityId, view: 'settings' },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private async generateRoomShortcuts(openMapping: boolean): Promise<void> {
     const valetudo = this.roomSource;
     const entity = this.config?.entity;
     if (!this.hass || !this.config || !entity || !valetudo?.mapSegments) {
@@ -171,6 +214,20 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
 
     const unmapped = rooms.filter((room) => !areaBySegment.has(room.id));
     if (unmapped.length) {
+      const features = Number(
+        this.hass.states[entity]?.attributes.supported_features ?? 0,
+      );
+      if (!(features & CLEAN_AREA_FEATURE)) {
+        this.roomsMessage = {
+          type: 'error',
+          text: localize('error.area_mapping_unsupported') ?? '',
+        };
+        return;
+      }
+      if (openMapping) {
+        this.openAreaMapping(entity);
+        return;
+      }
       this.roomsMessage = {
         type: 'error',
         text:
@@ -228,7 +285,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
 
     return html`
       <div class="room-shortcuts">
-        <ha-button @click=${this.generateRoomShortcuts}>
+        <ha-button @click=${() => this.generateRoomShortcuts(true)}>
           ${localize('editor.room_shortcuts')}
         </ha-button>
         <span class="help">

@@ -59,7 +59,8 @@
     "invalid_config": "Invalid configuration",
     "missing_entity": "Specifying entity is required!",
     "rooms_not_mapped": "These rooms are not mapped to Home Assistant areas: {rooms}. Map the vacuum's segments to areas in its entity settings, then try again.",
-    "no_rooms": "No rooms found in {sensor}."
+    "no_rooms": "No rooms found in {sensor}.",
+    "area_mapping_unsupported": "This vacuum doesn't support Home Assistant's segment-to-area mapping, so room icons can't be looked up. Update Valetudo and Home Assistant, then try again."
   },
   "warning": {
     "actions_array": "WARNING: 'actions' is reserved to override default actions for existing buttons. If your intention was to add additional actions, use the 'shortcuts' option instead."
@@ -79,7 +80,8 @@
     "room_shortcuts": "Generate Room Shortcuts",
     "room_shortcuts_help": "Adds a shortcut for each room in {sensor}, replacing existing shortcuts for the same robot's room cleaning topic.",
     "room_shortcuts_added": "Added {count} room shortcuts.",
-    "clean_room": "Clean {room}"
+    "clean_room": "Clean {room}",
+    "map_rooms_prompt": "Some rooms are not mapped to areas yet. In the dialog that opened, choose \"Map vacuum segments to areas\", save, then close the dialog to generate the shortcuts."
   },
   "mode": {
     "vacuum": "Vacuum",

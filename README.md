@@ -188,7 +188,7 @@ Set `valetudo: false` to turn off auto-detection completely.
 
 #### Room shortcuts
 
-For a Valetudo vacuum with a `sensor.*_map_segments` sensor, the visual editor shows a **Generate Room Shortcuts** button. It adds one [shortcut](#shortcuts-object) per room, named after the room in Valetudo and using the icon of the Home Assistant area the room is mapped to. Map the vacuum's segments to areas in its entity settings first; if any room isn't mapped, the editor shows an error and adds nothing. Existing shortcuts that publish to the same room-cleaning topic (e.g. ones generated earlier or written by hand) are replaced; all other shortcuts are kept.
+For a Valetudo vacuum with a `sensor.*_map_segments` sensor, the visual editor shows a **Generate Room Shortcuts** button. It adds one [shortcut](#shortcuts-object) per room, named after the room in Valetudo and using the icon of the Home Assistant area the room is mapped to. If any room isn't mapped to an area yet, the button opens the vacuum's settings, where you pick **Map vacuum segments to areas** and save; once you close that dialog the shortcuts are generated. If rooms are still unmapped, the editor shows an error listing them and adds nothing. Existing shortcuts that publish to the same room-cleaning topic (e.g. ones generated earlier or written by hand) are replaced; all other shortcuts are kept.
 
 Each generated shortcut looks like this:
 
