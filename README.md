@@ -1,15 +1,10 @@
-[![SWUbanner](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner-direct-single.svg)](https://stand-with-ukraine.pp.ua/)
-
 # Vacuum Card
 
-[![npm version][npm-image]][npm-url]
 [![hacs][hacs-image]][hacs-url]
-[![GitHub Sponsors][gh-sponsors-image]][gh-sponsors-url]
-[![Patreon][patreon-image]][patreon-url]
-[![Buy Me A Coffee][buymeacoffee-image]][buymeacoffee-url]
-[![Twitter][twitter-image]][twitter-url]
 
 > Vacuum cleaner card for [Home Assistant][home-assistant] Lovelace UI
+
+This is a fork of [denysdovhan/vacuum-card][upstream], modified for better compatibility and more options with more vacuums, including [Valetudo][valetudo]: a visual editor for every option, status-based visibility for buttons, shortcuts and sensors, header dropdowns, room shortcuts from Home Assistant's area mapping, and auto-detection of the vacuum's related entities.
 
 By default, Home Assistant does not provide any card for controlling vacuum cleaners. This card displays the state and allows to control your robot.
 
@@ -17,17 +12,13 @@ By default, Home Assistant does not provide any card for controlling vacuum clea
 
 ## Installing
 
-**💡 Tip:** If you like this project, consider giving me a tip for the time I spent building this project:
-
-<a href="https://www.buymeacoffee.com/denysdovhan" target="_blank">
-  <img src="https://cdn.buymeacoffee.com/buttons/default-black.png" alt="Buy Me A Coffee" width="150px">
-</a>
-
 ### HACS
 
-This card is available in [HACS][hacs] (Home Assistant Community Store).
+Add this repository to [HACS][hacs] (Home Assistant Community Store) as a custom repository:
 
-Just search for `Vacuum Card` in plugins tab.
+1. In HACS, open the menu (⋮) and choose **Custom repositories**.
+2. Enter `https://github.com/GraphicHealer/vacuum-card` and pick the **Dashboard** type.
+3. Search for `Vacuum Card` and download it.
 
 ### Manual
 
@@ -385,22 +376,12 @@ Huge thanks for their ideas and efforts 👍
 
 ## License
 
-MIT © [Denys Dovhan][denysdovhan]
+MIT © [Denys Dovhan][denysdovhan], modified by [GraphicHealer][graphichealer]
 
 <!-- Badges -->
 
-[npm-url]: https://npmjs.org/package/vacuum-card
-[npm-image]: https://img.shields.io/npm/v/vacuum-card.svg?style=flat-square
 [hacs-url]: https://github.com/hacs/integration
-[hacs-image]: https://img.shields.io/badge/hacs-default-orange.svg?style=flat-square
-[gh-sponsors-url]: https://github.com/sponsors/denysdovhan
-[gh-sponsors-image]: https://img.shields.io/github/sponsors/denysdovhan?style=flat-square
-[patreon-url]: https://patreon.com/denysdovhan
-[patreon-image]: https://img.shields.io/badge/support-patreon-F96854.svg?style=flat-square
-[buymeacoffee-url]: https://patreon.com/denysdovhan
-[buymeacoffee-image]: https://img.shields.io/badge/support-buymeacoffee-222222.svg?style=flat-square
-[twitter-url]: https://x.com/denysdovhan
-[twitter-image]: https://img.shields.io/badge/follow-%40denysdovhan-000000.svg?style=flat-square
+[hacs-image]: https://img.shields.io/badge/hacs-custom-orange.svg?style=flat-square
 
 <!-- References -->
 
@@ -410,11 +391,13 @@ MIT © [Denys Dovhan][denysdovhan]
 [preview-image]: https://github.com/denysdovhan/vacuum-card/assets/3459374/43808d3d-65a4-4e65-9531-4f248fa8861c
 [cleaning-gif]: https://user-images.githubusercontent.com/3459374/81119202-fa60b500-8f32-11ea-9b23-325efa93d7ab.gif
 [returning-gif]: https://user-images.githubusercontent.com/3459374/81119452-765afd00-8f33-11ea-9dc5-9c26ba3f8c45.gif
-[latest-release]: https://github.com/denysdovhan/vacuum-card/releases/latest
+[latest-release]: https://github.com/GraphicHealer/vacuum-card/releases/latest
 [ha-scripts]: https://www.home-assistant.io/docs/scripts/
-[edit-readme]: https://github.com/denysdovhan/vacuum-card/edit/main/README.md
+[edit-readme]: https://github.com/GraphicHealer/vacuum-card/edit/main/README.md
 [card-mod]: https://github.com/thomasloven/lovelace-card-mod
-[add-translation]: https://github.com/denysdovhan/vacuum-card/blob/master/CONTRIBUTING.md#how-to-add-translation
+[add-translation]: https://github.com/GraphicHealer/vacuum-card/blob/main/CONTRIBUTING.md#how-to-add-translation
 [macbury-smart-house]: https://macbury.github.io/SmartHouse/HomeAssistant/Vacuum/
 [bbbenji-card]: https://gist.github.com/bbbenji/24372e423f8669b2e6713638d8f8ceb2
 [denysdovhan]: https://denysdovhan.com
+[graphichealer]: https://github.com/GraphicHealer
+[upstream]: https://github.com/denysdovhan/vacuum-card
