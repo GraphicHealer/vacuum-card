@@ -58,7 +58,7 @@ This card can be configured using Lovelace UI editor.
 6. Optionally pick a battery sensor and map camera, add **Header Dropdowns** (fan speed, plus `select` entities such as cleaning mode or water level), **Sensors** (stats) and **Shortcuts**, each with its own name, icon and options.
 7. Now you should see the preview of the card!
 
-For a Valetudo vacuum, the editor writes everything it detects (battery sensor, header dropdowns and sensors) into the card config, so you can edit or remove any of it in the editor or in YAML.
+For any vacuum, the editor writes everything it detects into the card config, so you can edit or remove any of it in the editor or in YAML. It picks the vacuum device's battery sensor (if the vacuum has no `battery_level` attribute), its `select` entities as header dropdowns, and consumable (brush, filter, mop, …) and cleaning time / area sensors as sensors. Valetudo robots get [more specific detection](#valetudo).
 
 Shortcuts use Home Assistant's action picker: choose an action (e.g. `mqtt.publish`) and its fields and target are shown for you to fill in. It is saved in the same `action` / `data` / `target` format as automations.
 
@@ -128,7 +128,7 @@ Here is what every option means:
 | `stats`          |  `array`  | Optional     | Stats (sensors) for your vacuum cleaner, each optionally limited to some vacuum statuses.                 |
 | `actions`        | `object`  | Optional     | Override what the toolbar buttons do and when they show.                                                  |
 | `shortcuts`      |  `array`  | Optional     | List of shortcuts shown at the right bottom part of the card with custom actions for your vacuum cleaner. |
-| `valetudo`       | `boolean` | `true`       | Valetudo auto-detection. Set `false` to disable.                                                          |
+| `valetudo`       | `boolean` | `true`       | Valetudo-specific auto-detection. Set `false` to use the generic detection instead.                       |
 
 ### Header dropdowns (`selects`)
 
@@ -161,7 +161,7 @@ selects:
   - select.robot_water
 ```
 
-- Leave `selects` out to use the auto-detected dropdowns: fan speed (if the vacuum has fan speeds) plus Valetudo's mode and water selects (see below). The visual editor writes them into `selects` so you can edit or remove them.
+- Leave `selects` out to use the auto-detected dropdowns: fan speed (if the vacuum has fan speeds) plus the vacuum device's `select` entities (for Valetudo, only mode and water; see below). The visual editor writes them into `selects` so you can edit or remove them.
 - List only the entities you want to show; anything not listed is hidden.
 - `selects: []` hides all select dropdowns.
 - A select whose entity doesn't exist or has no options is not shown.
@@ -187,7 +187,7 @@ The card then uses these entities from the same device, if the robot has them:
 
 Anything you configure explicitly takes precedence. The visual editor writes the detected `battery_entity`, `selects` and `stats` into the card config, so you can change icons, names and options or remove items. Use `selects: []` or `stats: []` to show none; if a key is left out entirely, the card falls back to auto-detection.
 
-Set `valetudo: false` to turn off auto-detection completely.
+Set `valetudo: false` to use the generic detection described in [Visual editor](#visual-editor) instead.
 
 ### Room shortcuts
 

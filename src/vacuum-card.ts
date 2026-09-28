@@ -34,10 +34,10 @@ import {
   SelectEntity,
 } from './types';
 import {
-  ValetudoEntities,
-  findValetudoEntities,
+  DetectedEntities,
+  findVacuumEntities,
   getDefaultSelects,
-  getValetudoStats,
+  getDetectedStats,
   normalizeSelect,
 } from './valetudo';
 import DEFAULT_IMAGE from './vacuum.svg';
@@ -68,9 +68,9 @@ export class VacuumCard extends LitElement {
   @state() private requestInProgress = false;
 
   private thumbUpdater: ReturnType<typeof setInterval> | null = null;
-  private valetudoCache: {
+  private detectedCache: {
     key: unknown[];
-    value: ValetudoEntities | null;
+    value: DetectedEntities | null;
   } | null = null;
 
   static get styles(): CSSResultGroup {
@@ -101,7 +101,7 @@ export class VacuumCard extends LitElement {
     return this.hass.states[this.config.map];
   }
 
-  get valetudo(): ValetudoEntities | null {
+  get detected(): DetectedEntities | null {
     if (!this.hass || !this.config) {
       return null;
     }
@@ -114,16 +114,16 @@ export class VacuumCard extends LitElement {
     ];
 
     if (
-      !this.valetudoCache ||
-      this.valetudoCache.key.some((value, i) => value !== key[i])
+      !this.detectedCache ||
+      this.detectedCache.key.some((value, i) => value !== key[i])
     ) {
-      this.valetudoCache = {
+      this.detectedCache = {
         key,
-        value: findValetudoEntities(this.hass, this.config),
+        value: findVacuumEntities(this.hass, this.config),
       };
     }
 
-    return this.valetudoCache.value;
+    return this.detectedCache.value;
   }
 
   get batteryEntity(): VacuumBatteryEntity | null {
@@ -134,7 +134,7 @@ export class VacuumCard extends LitElement {
     const batteryEntityId =
       this.config.battery_entity ||
       (this.entity?.attributes.battery_level == null
-        ? (this.valetudo?.battery ?? this.findDeviceBatteryEntity())
+        ? (this.detected?.battery ?? this.findDeviceBatteryEntity())
         : undefined);
 
     if (!batteryEntityId) {
@@ -146,16 +146,16 @@ export class VacuumCard extends LitElement {
   get selectItems(): VacuumCardSelect[] {
     return (
       this.config.selects ??
-      getDefaultSelects(this.hass, this.config.entity, this.valetudo)
+      getDefaultSelects(this.hass, this.config.entity, this.detected)
     ).map(normalizeSelect);
   }
 
   get stats(): VacuumCardStat[] {
-    if (this.config.stats || !this.valetudo) {
+    if (this.config.stats || !this.detected) {
       return this.config.stats ?? [];
     }
 
-    return getValetudoStats(this.hass, this.valetudo, {
+    return getDetectedStats(this.hass, this.detected, {
       cleaningTime: localize('stats.cleaning_time') ?? 'Cleaning time',
       cleanedArea: localize('stats.cleaned_area') ?? 'Cleaned area',
     });
@@ -176,7 +176,7 @@ export class VacuumCard extends LitElement {
   }
 
   private getWatchedEntityIds(): string[] {
-    const valetudo = this.valetudo;
+    const valetudo = this.detected;
     const statEntities = this.stats.map((stat) => stat.entity_id);
 
     return [
@@ -636,7 +636,7 @@ export class VacuumCard extends LitElement {
   }
 
   private getValetudoStatus(): string | undefined {
-    const valetudo = this.valetudo;
+    const valetudo = this.detected;
     if (!valetudo) {
       return undefined;
     }

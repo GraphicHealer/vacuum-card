@@ -106,6 +106,7 @@ export interface EntityRegistryDisplayEntry {
   name?: string | null;
   device_id?: string;
   platform?: string;
+  hidden?: boolean;
 }
 
 export interface DeviceRegistryEntry {

@@ -23,9 +23,9 @@ import {
   VacuumSegment,
 } from './types';
 import {
-  findValetudoEntities,
+  findVacuumEntities,
   getDefaultSelects,
-  getValetudoDefaults,
+  getDetectedDefaults,
   normalizeSelect,
 } from './valetudo';
 import { TOOLBAR_BUTTONS, VACUUM_STATES, normalizeStats } from './config';
@@ -271,13 +271,13 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     if (!this.hass) {
       return {};
     }
-    const valetudo = findValetudoEntities(this.hass, {
+    const detected = findVacuumEntities(this.hass, {
       entity,
       valetudo: this.config?.valetudo ?? true,
     });
-    const selects = getDefaultSelects(this.hass, entity, valetudo);
+    const selects = getDefaultSelects(this.hass, entity, detected);
     return {
-      ...getValetudoDefaults(this.hass, valetudo, {
+      ...getDetectedDefaults(this.hass, detected, {
         cleaningTime: localize('stats.cleaning_time') ?? 'Cleaning time',
         cleanedArea: localize('stats.cleaned_area') ?? 'Cleaned area',
       }),
