@@ -42,12 +42,9 @@
 
 .items {
   display: flex;
+  padding: 8px 0;
   flex-direction: column;
   gap: 8px;
-
-  .items-title {
-    font-weight: 500;
-  }
 
   .item {
     display: flex;

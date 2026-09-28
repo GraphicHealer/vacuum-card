@@ -114,7 +114,8 @@
     "action_resume": "Continue",
     "action_stop": "Stop",
     "action_locate": "Locate",
-    "action_return_to_base": "Dock"
+    "action_return_to_base": "Dock",
+    "item_count": "{count} items"
   },
   "mode": {
     "vacuum": "Vacuum",

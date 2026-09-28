@@ -605,35 +605,40 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     ];
 
     return html`
-      <div class="items">
-        <div class="items-title">${localize('editor.shortcuts')}</div>
-        ${items.map((item, index) =>
-          this.renderItem(
-            item.name || item.action || '',
-            item.action ?? '',
-            schema,
-            shortcutToForm(item),
-            (value) =>
-              this.setShortcuts(
-                items.map((old, i) =>
-                  i === index ? shortcutFromForm(value as ShortcutForm) : old,
+      <ha-expansion-panel
+        outlined
+        .header=${localize('editor.shortcuts')}
+        .secondary=${localize('editor.item_count', '{count}', String(items.length))}
+      >
+        <div class="items">
+          ${items.map((item, index) =>
+            this.renderItem(
+              item.name || item.action || '',
+              item.action ?? '',
+              schema,
+              shortcutToForm(item),
+              (value) =>
+                this.setShortcuts(
+                  items.map((old, i) =>
+                    i === index ? shortcutFromForm(value as ShortcutForm) : old,
+                  ),
                 ),
-              ),
-            () => this.setShortcuts(items.filter((_, i) => i !== index)),
-          ),
-        )}
-        <ha-button
-          appearance="plain"
-          @click=${() =>
-            this.setShortcuts([
-              ...items,
-              { name: localize('editor.new_shortcut') ?? 'Shortcut' },
-            ])}
-        >
-          ${localize('editor.shortcut_add')}
-        </ha-button>
-        ${this.renderRoomShortcuts()}
-      </div>
+              () => this.setShortcuts(items.filter((_, i) => i !== index)),
+            ),
+          )}
+          <ha-button
+            appearance="plain"
+            @click=${() =>
+              this.setShortcuts([
+                ...items,
+                { name: localize('editor.new_shortcut') ?? 'Shortcut' },
+              ])}
+          >
+            ${localize('editor.shortcut_add')}
+          </ha-button>
+          ${this.renderRoomShortcuts()}
+        </div>
+      </ha-expansion-panel>
     `;
   }
 
@@ -796,27 +801,32 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     const items = (this.config?.selects ?? []).map(normalizeSelect);
 
     return html`
-      <div class="items">
-        <div class="items-title">${localize('editor.selects')}</div>
-        ${items.map((item, index) =>
-          this.renderItem(
-            item.name || (this.entityName(item.entity) ?? item.entity),
-            item.entity,
-            this.selectSchema(item),
-            { ...item },
-            (value) =>
-              this.setSelects(
-                items.map((old, i) =>
-                  i === index ? (value as unknown as VacuumCardSelect) : old,
+      <ha-expansion-panel
+        outlined
+        .header=${localize('editor.selects')}
+        .secondary=${localize('editor.item_count', '{count}', String(items.length))}
+      >
+        <div class="items">
+          ${items.map((item, index) =>
+            this.renderItem(
+              item.name || (this.entityName(item.entity) ?? item.entity),
+              item.entity,
+              this.selectSchema(item),
+              { ...item },
+              (value) =>
+                this.setSelects(
+                  items.map((old, i) =>
+                    i === index ? (value as unknown as VacuumCardSelect) : old,
+                  ),
                 ),
-              ),
-            () => this.setSelects(items.filter((_, i) => i !== index)),
-          ),
-        )}
-        ${this.renderAddEntity({ domain: SELECT_DOMAINS }, (entity) =>
-          this.setSelects([...items, { entity }]),
-        )}
-      </div>
+              () => this.setSelects(items.filter((_, i) => i !== index)),
+            ),
+          )}
+          ${this.renderAddEntity({ domain: SELECT_DOMAINS }, (entity) =>
+            this.setSelects([...items, { entity }]),
+          )}
+        </div>
+      </ha-expansion-panel>
     `;
   }
 
@@ -862,33 +872,38 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
           );
 
     return html`
-      <div class="items">
-        <div class="items-title">${title}</div>
-        ${list.map((stat, index) =>
-          this.renderItem(
-            stat.subtitle ||
-              this.entityName(stat.entity_id) ||
-              stat.attribute ||
-              '',
-            [stat.entity_id, stat.attribute].filter(Boolean).join(' · '),
-            this.statSchema(stat),
-            { ...stat },
-            (value) =>
-              this.setStats(
-                state,
-                list.map((old, i) => (i === index ? value : old)),
-              ),
-            () =>
-              this.setStats(
-                state,
-                list.filter((_, i) => i !== index),
-              ),
-          ),
-        )}
-        ${this.renderAddEntity({}, (entity_id) =>
-          this.setStats(state, [...list, { entity_id }]),
-        )}
-      </div>
+      <ha-expansion-panel
+        outlined
+        .header=${title}
+        .secondary=${localize('editor.item_count', '{count}', String(list.length))}
+      >
+        <div class="items">
+          ${list.map((stat, index) =>
+            this.renderItem(
+              stat.subtitle ||
+                this.entityName(stat.entity_id) ||
+                stat.attribute ||
+                '',
+              [stat.entity_id, stat.attribute].filter(Boolean).join(' · '),
+              this.statSchema(stat),
+              { ...stat },
+              (value) =>
+                this.setStats(
+                  state,
+                  list.map((old, i) => (i === index ? value : old)),
+                ),
+              () =>
+                this.setStats(
+                  state,
+                  list.filter((_, i) => i !== index),
+                ),
+            ),
+          )}
+          ${this.renderAddEntity({}, (entity_id) =>
+            this.setStats(state, [...list, { entity_id }]),
+          )}
+        </div>
+      </ha-expansion-panel>
     `;
   }
 
