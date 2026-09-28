@@ -62,7 +62,7 @@ For a Valetudo vacuum, the editor writes everything it detects (battery sensor, 
 
 Shortcuts use Home Assistant's action picker: choose an action (e.g. `mqtt.publish`) and its fields and target are shown for you to fill in. It is saved in the same `action` / `data` / `target` format as automations.
 
-_Overriding the toolbar buttons with `actions` is only available in the code editor._
+The collapsible **Toolbar Actions** section sets what the main buttons (start, pause, resume, stop, locate, return to base) do. The editor fills each one with its standard vacuum action (e.g. `vacuum.start` targeting your vacuum), so you can change it with the same action picker. A button whose action is cleared falls back to the standard vacuum action.
 
 Typical example of using this card in YAML config would look like this:
 
@@ -235,7 +235,15 @@ You can use any attribute of vacuum or even any entity by `entity_id` to display
 
 ### `actions` object
 
-You can define action calls to override default actions behavior. Available actions to override are `start`, `pause`, `resume`, `stop`, `locate` and `return_to_base`. They use the same `action` / `data` / `target` format as automations.
+You can define action calls to override default actions behavior. Available actions to override are `start`, `pause`, `resume`, `stop`, `locate` and `return_to_base`. They use the same `action` / `data` / `target` format as automations, and the visual editor pre-fills them with the standard vacuum actions:
+
+```yaml
+actions:
+  start:
+    action: vacuum.start
+    target:
+      entity_id: vacuum.robot
+```
 
 | Name     |   Type   | Default      | Description                                                    |
 | -------- | :------: | ------------ | -------------------------------------------------------------- |

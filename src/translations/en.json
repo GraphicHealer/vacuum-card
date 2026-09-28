@@ -106,7 +106,15 @@
     "shortcuts": "Shortcuts",
     "shortcut_add": "Add shortcut",
     "new_shortcut": "New shortcut",
-    "item_tap_action": "Action"
+    "item_tap_action": "Action",
+    "toolbar_actions": "Toolbar Actions",
+    "toolbar_actions_help": "What the main vacuum buttons do. Cleared buttons use the standard vacuum action.",
+    "action_start": "Clean",
+    "action_pause": "Pause",
+    "action_resume": "Continue",
+    "action_stop": "Stop",
+    "action_locate": "Locate",
+    "action_return_to_base": "Dock"
   },
   "mode": {
     "vacuum": "Vacuum",

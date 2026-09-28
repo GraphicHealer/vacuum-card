@@ -13,6 +13,7 @@ import {
   ExtendedHomeAssistant,
   SelectEntity,
   Template,
+  VacuumCardAction,
   VacuumCardConfig,
   VacuumCardSelect,
   VacuumCardShortcut,
@@ -44,39 +45,80 @@ interface ItemSchema {
 
 type ItemValue = Record<string, unknown>;
 
-const DETECTED_KEYS = ['battery_entity', 'selects', 'stats'] as const;
+const DETECTED_KEYS = [
+  'battery_entity',
+  'selects',
+  'stats',
+  'actions',
+] as const;
+const TOOLBAR_ACTIONS: Record<string, string> = {
+  start: 'start',
+  pause: 'pause',
+  resume: 'start',
+  stop: 'stop',
+  locate: 'locate',
+  return_to_base: 'return_to_base',
+};
+const UI_ACTION_SELECTOR = {
+  ui_action: {
+    actions: ['perform-action'],
+    default_action: 'perform-action',
+  },
+};
 const SELECT_DOMAINS = ['select', 'input_select'];
 const STAT_STATES = ['default', 'cleaning'];
+
+interface UiActionForm {
+  action?: string;
+  perform_action?: string;
+  data?: Record<string, unknown>;
+  target?: HassServiceTarget;
+}
 
 interface ShortcutForm extends ItemValue {
   name?: string;
   icon?: string;
-  tap_action?: {
-    action?: string;
-    perform_action?: string;
-    data?: Record<string, unknown>;
-    target?: HassServiceTarget;
-  };
+  tap_action?: UiActionForm;
+}
+
+function actionToForm({
+  action,
+  data,
+  target,
+}: Partial<VacuumCardAction>): UiActionForm | undefined {
+  return action
+    ? cleanItem({
+        action: 'perform-action',
+        perform_action: action,
+        data,
+        target,
+      })
+    : undefined;
+}
+
+function actionFromForm(
+  form?: UiActionForm,
+): Partial<VacuumCardAction> | undefined {
+  if (!form?.perform_action) {
+    return undefined;
+  }
+  return cleanItem<ItemValue>({
+    action: form.perform_action,
+    data: form.data && Object.keys(form.data).length ? form.data : undefined,
+    target:
+      form.target && Object.keys(form.target).length ? form.target : undefined,
+  });
 }
 
 function shortcutToForm({
   name,
   icon,
-  action,
-  data,
-  target,
+  ...action
 }: VacuumCardShortcut): ShortcutForm {
   return cleanItem<ShortcutForm>({
     name,
     icon,
-    tap_action: action
-      ? cleanItem({
-          action: 'perform-action',
-          perform_action: action,
-          data,
-          target,
-        })
-      : undefined,
+    tap_action: actionToForm(action),
   });
 }
 
@@ -88,16 +130,17 @@ function shortcutFromForm({
   return cleanItem<ItemValue>({
     name,
     icon,
-    action: tap_action?.perform_action || undefined,
-    data:
-      tap_action?.data && Object.keys(tap_action.data).length
-        ? tap_action.data
-        : undefined,
-    target:
-      tap_action?.target && Object.keys(tap_action.target).length
-        ? tap_action.target
-        : undefined,
+    ...actionFromForm(tap_action),
   }) as VacuumCardShortcut;
+}
+
+function defaultActions(entity: string): Record<string, VacuumCardAction> {
+  return Object.fromEntries(
+    Object.entries(TOOLBAR_ACTIONS).map(([key, service]) => [
+      key,
+      { action: `vacuum.${service}`, target: { entity_id: entity } },
+    ]),
+  );
 }
 
 function roomSegment(
@@ -230,10 +273,13 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
       entity,
       valetudo: this.config?.valetudo ?? true,
     });
-    return getValetudoDefaults(this.hass, valetudo, {
-      cleaningTime: localize('stats.cleaning_time') ?? 'Cleaning time',
-      cleanedArea: localize('stats.cleaned_area') ?? 'Cleaned area',
-    });
+    return {
+      ...getValetudoDefaults(this.hass, valetudo, {
+        cleaningTime: localize('stats.cleaning_time') ?? 'Cleaning time',
+        cleanedArea: localize('stats.cleaned_area') ?? 'Cleaned area',
+      }),
+      actions: defaultActions(entity),
+    };
   }
 
   private fillDetected(): void {
@@ -506,20 +552,56 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     this.updateConfig({ ...this.config!, shortcuts });
   }
 
+  private renderToolbarActions(): Template {
+    const actions = this.config?.actions ?? {};
+    const data = Object.fromEntries(
+      Object.entries(actions).map(([key, action]) => [
+        key,
+        actionToForm(action),
+      ]),
+    );
+
+    return html`
+      <ha-expansion-panel
+        outlined
+        .header=${localize('editor.toolbar_actions')}
+        .secondary=${localize('editor.toolbar_actions_help')}
+      >
+        <div class="item">
+          <ha-form
+            .hass=${this.hass}
+            .data=${data}
+            .schema=${Object.keys(TOOLBAR_ACTIONS).map((name) => ({
+              name,
+              selector: UI_ACTION_SELECTOR,
+            }))}
+            .computeLabel=${({ name }: ItemSchema) =>
+              localize(`editor.action_${name}`) ?? name}
+            @value-changed=${(
+              event: CustomEvent<{ value: Record<string, UiActionForm> }>,
+            ) => {
+              event.stopPropagation();
+              const next: Record<string, VacuumCardAction> = {};
+              for (const [key, form] of Object.entries(event.detail.value)) {
+                const action = actionFromForm(form);
+                if (action?.action) {
+                  next[key] = action as VacuumCardAction;
+                }
+              }
+              this.updateConfig({ ...this.config!, actions: next });
+            }}
+          ></ha-form>
+        </div>
+      </ha-expansion-panel>
+    `;
+  }
+
   private renderShortcuts(): Template {
     const items = this.config?.shortcuts ?? [];
     const schema: ItemSchema[] = [
       { name: 'name', selector: { text: {} } },
       { name: 'icon', selector: { icon: {} } },
-      {
-        name: 'tap_action',
-        selector: {
-          ui_action: {
-            actions: ['perform-action'],
-            default_action: 'perform-action',
-          },
-        },
-      },
+      { name: 'tap_action', selector: UI_ACTION_SELECTOR },
     ];
 
     return html`
@@ -836,8 +918,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
           @value-changed=${this.valueChanged}
         ></ha-form>
         ${this.renderSelects()} ${this.renderAllStats()}
-        ${this.renderShortcuts()}
-        <strong>${localize('editor.code_only_note')}</strong>
+        ${this.renderShortcuts()} ${this.renderToolbarActions()}
       </div>
     `;
   }

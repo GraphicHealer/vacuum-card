@@ -440,6 +440,10 @@ export class VacuumCard extends LitElement {
       }
 
       this.callService(this.config.actions[action]);
+      if (params.request) {
+        this.requestInProgress = true;
+        this.requestUpdate();
+      }
     };
   }
 
