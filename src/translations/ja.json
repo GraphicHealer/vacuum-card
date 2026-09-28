@@ -65,17 +65,9 @@
     "map": "マップカメラ（オプション）",
     "image": "イメージ（オプション）",
     "compact_view": "コンパクトビュー",
-    "compact_view_aria_label_on": "コンパクトビューをオンにする",
-    "compact_view_aria_label_off": "コンパクトビューをオフにする",
     "show_name": "名前を表示",
-    "show_name_aria_label_on": "名前の表示をオンにする",
-    "show_name_aria_label_off": "名前の表示をオフにする",
     "show_status": "ステータスを表示",
-    "show_status_aria_label_on": "ステータスの表示をオンにする",
-    "show_status_aria_label_off": "ステータスの表示をオフにする",
     "show_toolbar": "ツールバーを表示",
-    "show_toolbar_aria_label_on": "ツールバーの表示をオンにする",
-    "show_toolbar_aria_label_off": "ツールバーの表示をオフにする",
     "code_only_note": "注：actionとstatsのオプション設定は、コードエディターで行ってください。"
   }
 }

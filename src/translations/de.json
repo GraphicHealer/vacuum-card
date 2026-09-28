@@ -65,17 +65,9 @@
     "map": "Kartenkamera (Optional)",
     "image": "Bild (Optional)",
     "compact_view": "kompakte Ansicht",
-    "compact_view_aria_label_on": "Schalte kompakte Ansicht ein",
-    "compact_view_aria_label_off": "Schalte kompakte Ansicht aus",
     "show_name": "Zeige Namen",
-    "show_name_aria_label_on": "Schalte 'Zeige Namen' ein",
-    "show_name_aria_label_off": "Schalte 'Zeige Namen' aus",
     "show_status": "Zeige Status",
-    "show_status_aria_label_on": "Schalte 'Zeige Status' ein",
-    "show_status_aria_label_off": "Schalte 'Zeige Status' aus",
     "show_toolbar": "Zeige Toolbar",
-    "show_toolbar_aria_label_on": "Schalte 'Zeige Toolbar' ein",
-    "show_toolbar_aria_label_off": "Schalte 'Zeige Toolbar' aus",
     "code_only_note": "Hinweis: Das Festlegen von Aktionen und Statistikoptionen ist ausschließlich mit dem Code-Editor möglich."
   }
 }

@@ -65,17 +65,9 @@
     "map": "Térkép kamera (opcionális)",
     "image": "Kép (opcionális)",
     "compact_view": "Kompakt nézet",
-    "compact_view_aria_label_on": "Kompakt nézet bekapcsolása",
-    "compact_view_aria_label_off": "Kompakt nézet kikapcsolása",
     "show_name": "Név megjelenítése",
-    "show_name_aria_label_on": "Név megjelenítésének bekapcsolása",
-    "show_name_aria_label_off": "Név megjelenítésének kikapcsolása",
     "show_status": "Állapot megjelenítése",
-    "show_status_aria_label_on": "Állapot megjelenítésének bekapcsolása",
-    "show_status_aria_label_off": "Állapot megjelenítésének kikapcsolása",
     "show_toolbar": "Eszköztár megjelenítése",
-    "show_toolbar_aria_label_on": "Eszköztár megjelenítésének bekapcsolása",
-    "show_toolbar_aria_label_off": "Eszköztár megjelenítésének kikapcsolása",
     "code_only_note": "Megjegyzés: A műveletek és statisztika beállítások kizárólag a kód szerkesztő használatával érhetők el."
   }
 }

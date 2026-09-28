@@ -65,17 +65,9 @@
     "map": "Camera Harta (Optional)",
     "image": "Imagine (Optional)",
     "compact_view": "Vizualizare compactă",
-    "compact_view_aria_label_on": "Pornește vizualizare compactă",
-    "compact_view_aria_label_off": "Oprește vizualizare compactă compact view off",
     "show_name": "Arată Nume",
-    "show_name_aria_label_on": "Pornește arată nume",
-    "show_name_aria_label_off": "Oprește arată nume",
     "show_status": "Arată Status",
-    "show_status_aria_label_on": "Pornește arată status",
-    "show_status_aria_label_off": "Oprește arată status",
     "show_toolbar": "Arată bara de instrumente",
-    "show_toolbar_aria_label_on": "Pornește arată bara de instrumente",
-    "show_toolbar_aria_label_off": "Oprește arată bara de instrumente",
     "code_only_note": "Notă: Acțiunile de setare și opțiunile de statistici sunt disponibile exclusiv folosind Editorul de cod."
   }
 }

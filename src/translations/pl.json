@@ -65,17 +65,9 @@
     "map": "Kamera z mapą (opcjonalna)",
     "image": "Obraz (opcjonalny)",
     "compact_view": "Widok kompaktowy",
-    "compact_view_aria_label_on": "Włącz widok kompaktowy",
-    "compact_view_aria_label_off": "Wyłącz widok kompaktowy",
     "show_name": "Pokaż nazwę",
-    "show_name_aria_label_on": "Włącz widok nazwy",
-    "show_name_aria_label_off": "Wyłącz widok nazwy",
     "show_status": "Pokaż pasek statusu",
-    "show_status_aria_label_on": "Włącz widok paska statusu",
-    "show_status_aria_label_off": "Wyłącz widok paska statusu",
     "show_toolbar": "Pasek narzędzi",
-    "show_toolbar_aria_label_on": "Włącz pasek narzędzi",
-    "show_toolbar_aria_label_off": "Wyłącz pasek narzędzi",
     "code_only_note": "Uwaga: Ustawianie opcji i informacji statystyk jest dostępne tylko poprzez edytor kodu YAML."
   }
 }

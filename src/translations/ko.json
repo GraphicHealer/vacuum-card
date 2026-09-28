@@ -65,17 +65,9 @@
     "map": "도면 (선택)",
     "image": "이미지 (선택)",
     "compact_view": "간단히 보기",
-    "compact_view_aria_label_on": "간단히 보기 켜기",
-    "compact_view_aria_label_off": "간단히 보기 끄기",
     "show_name": "이름 표시",
-    "show_name_aria_label_on": "이름 표시 켜기",
-    "show_name_aria_label_off": "이름 표시 끄기",
     "show_status": "상태 표시",
-    "show_status_aria_label_on": "상태 표시 켜기",
-    "show_status_aria_label_off": "상태 표시 끄기",
     "show_toolbar": "툴바 표시",
-    "show_toolbar_aria_label_on": "툴바 표시 켜기",
-    "show_toolbar_aria_label_off": "툴바 표시 끄기",
     "code_only_note": "참고: 동작 및 상태 옵션 설정은 코드 편집기에서만 사용할 수 있습니다."
   }
 }

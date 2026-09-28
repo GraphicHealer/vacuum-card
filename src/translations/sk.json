@@ -65,17 +65,9 @@
     "map": "Mapa (voliteľné)",
     "image": "Obrázok (voliteľné)",
     "compact_view": "Kompaktné zobrazenie",
-    "compact_view_aria_label_on": "Kompaktné zobrazenie zapnuté",
-    "compact_view_aria_label_off": "Kompaktné zobrazenie vypnuté",
     "show_name": "Zobrazenie názvu",
-    "show_name_aria_label_on": "Zobrazenie názvu zapnuté",
-    "show_name_aria_label_off": "Zobrazenie názvu vypnuté",
     "show_status": "Zobrazenie stavu",
-    "show_status_aria_label_on": "Zobrazenie stavu zapnuté",
-    "show_status_aria_label_off": "Zobrazenie stavu vypnuté",
     "show_toolbar": "Zobrazenie panela",
-    "show_toolbar_aria_label_on": "Zobrazenie panela zapnuté",
-    "show_toolbar_aria_label_off": "Zobrazenie panela vypnuté",
     "code_only_note": "Poznámka: Nastavenie stavov a akcií je dostupné len pomocou editora kódu."
   }
 }

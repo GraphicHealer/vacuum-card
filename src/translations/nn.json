@@ -65,17 +65,9 @@
     "map": "Kartkamera (valfritt)",
     "image": "Bilde (valfritt)",
     "compact_view": "Kompakt vising",
-    "compact_view_aria_label_on": "Slå på kompakt vising",
-    "compact_view_aria_label_off": "Slå av kompakt vising",
     "show_name": "Vis namn",
-    "show_name_aria_label_on": "Slå visingsnanet på",
-    "show_name_aria_label_off": "Slå visingsnamnet av",
     "show_status": "Vis status",
-    "show_status_aria_label_on": "Slå skjermstatus på",
-    "show_status_aria_label_off": "Slå skjermstatus av",
     "show_toolbar": "Vis verktøylinja",
-    "show_toolbar_aria_label_on": "Slå skjermverktøylinja på",
-    "show_toolbar_aria_label_off": "Slå skjermverktøylinja av",
     "code_only_note": "Merk: Innstillingshandlingar og statistikkalternativ er berre tilgjengeleg ved hjelp av Code Editor."
   }
 }

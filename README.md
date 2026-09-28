@@ -106,21 +106,47 @@ shortcuts:
 
 Here is what every option means:
 
-| Name             |   Type    | Default      | Description                                                                                               |
-| ---------------- | :-------: | ------------ | --------------------------------------------------------------------------------------------------------- |
-| `type`           | `string`  | **Required** | `custom:vacuum-card`                                                                                      |
-| `entity`         | `string`  | **Required** | An entity_id within the `vacuum` domain.                                                                  |
-| `battery_entity` | `string`  | Optional     | An entity_id within the `sensor` domain to display battery state and icon.                                |
-| `map`            | `string`  | Optional     | An entity_id within the `camera` domain, for streaming live vacuum map.                                   |
-| `map_refresh`    | `integer` | `5`          | Update interval for map camera in seconds                                                                 |
-| `image`          | `string`  | `default`    | Path to image of your vacuum cleaner. Better to have `png` or `svg`.                                      |
-| `show_name`      | `boolean` | `true`       | Show friendly name of the vacuum.                                                                         |
-| `show_status`    | `boolean` | `true`       | Show status of the vacuum.                                                                                |
-| `show_toolbar`   | `boolean` | `true`       | Show toolbar with actions.                                                                                |
-| `compact_view`   | `boolean` | `false`      | Compact view without image.                                                                               |
-| `stats`          | `object`  | Optional     | Custom per state stats for your vacuum cleaner                                                            |
-| `actions`        | `object`  | Optional     | Override default actions behavior with service invocations.                                               |
-| `shortcuts`      |  `array`  | Optional     | List of shortcuts shown at the right bottom part of the card with custom actions for your vacuum cleaner. |
+| Name             |         Type         | Default      | Description                                                                                               |
+| ---------------- | :------------------: | ------------ | --------------------------------------------------------------------------------------------------------- |
+| `type`           |       `string`       | **Required** | `custom:vacuum-card`                                                                                      |
+| `entity`         |       `string`       | **Required** | An entity_id within the `vacuum` domain.                                                                  |
+| `battery_entity` |       `string`       | Optional     | An entity_id within the `sensor` domain to display battery state and icon.                                |
+| `selects`        |       `array`        | Optional     | `select` / `input_select` entity_ids shown as dropdowns next to fan speed (e.g. cleaning mode, water).    |
+| `map`            |       `string`       | Optional     | An entity_id within the `camera` or `image` domain, for streaming live vacuum map.                        |
+| `map_refresh`    |      `integer`       | `5`          | Update interval for map camera in seconds                                                                 |
+| `image`          |       `string`       | `default`    | Path to image of your vacuum cleaner. Better to have `png` or `svg`.                                      |
+| `show_name`      |      `boolean`       | `true`       | Show friendly name of the vacuum.                                                                         |
+| `show_status`    |      `boolean`       | `true`       | Show status of the vacuum.                                                                                |
+| `show_toolbar`   |      `boolean`       | `true`       | Show toolbar with actions.                                                                                |
+| `compact_view`   |      `boolean`       | `false`      | Compact view without image.                                                                               |
+| `stats`          |       `object`       | Optional     | Custom per state stats for your vacuum cleaner                                                            |
+| `actions`        |       `object`       | Optional     | Override default actions behavior with service invocations.                                               |
+| `shortcuts`      |       `array`        | Optional     | List of shortcuts shown at the right bottom part of the card with custom actions for your vacuum cleaner. |
+| `valetudo`       | `boolean` / `object` | `true`       | Valetudo auto-detection. Set `false` to disable, or an object with `topic_prefix`, `identifier`, `rooms`. |
+
+### Select entities
+
+Each entity in `selects` is rendered as a dropdown in the header, next to fan speed. Options are read live from the entity's `options` attribute and the icon comes from the entity itself, so any integration's modes work:
+
+```yaml
+type: custom:vacuum-card
+entity: vacuum.robot
+selects:
+  - select.robot_mode
+  - select.robot_water
+```
+
+### Valetudo
+
+Valetudo robots (MQTT autodiscovery) are detected automatically. Without extra config the card picks up the battery level, error and status-flag sensors, the `Mode` and `Water` selects, consumables and current cleaning statistics, and shows the map's rooms as chips — select rooms and press start to clean them. Anything you configure explicitly (`battery_entity`, `selects`, `stats`) takes precedence.
+
+```yaml
+type: custom:vacuum-card
+entity: vacuum.valetudo_robot
+valetudo:
+  topic_prefix: valetudo # only if changed in Valetudo's MQTT settings
+  rooms: true
+```
 
 ### `stats` object
 
