@@ -8,7 +8,6 @@ import {
   computeStateDisplay,
   stateIcon,
 } from 'custom-card-helpers';
-import registerTemplates from 'ha-template';
 import get from 'lodash/get';
 import localize from './localize';
 import styles from './styles.css';
@@ -43,8 +42,7 @@ import {
   normalizeSelect,
 } from './valetudo';
 import DEFAULT_IMAGE from './vacuum.svg';
-
-registerTemplates();
+import './template';
 
 // String in the right side will be replaced by Rollup
 const PKG_VERSION = 'PKG_VERSION_VALUE';
@@ -605,12 +603,11 @@ export class VacuumCard extends LitElement {
 
         const value = value_template
           ? html`
-              <ha-template
+              <vacuum-card-template
                 .hass=${this.hass}
                 .template=${value_template}
                 .value=${state}
-                .variables=${{ value: state }}
-              ></ha-template>
+              ></vacuum-card-template>
             `
           : (state ?? '');
 
