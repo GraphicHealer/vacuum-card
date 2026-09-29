@@ -257,6 +257,8 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
 
   private filledEntity?: string;
 
+  private filledDefaults?: ReturnType<VacuumCardEditor['detectedDefaults']>;
+
   setConfig(config: EditorConfig): void {
     const next: EditorConfig = { ...config };
     if (next.stats && !Array.isArray(next.stats)) {
@@ -285,15 +287,6 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
   }
 
   protected updated(): void {
-    if (this.hass && this.config && !this.config.entity) {
-      const entity = Object.keys(this.hass.states).find((id) =>
-        id.startsWith('vacuum.'),
-      );
-      if (entity) {
-        this.updateConfig({ ...this.config, entity });
-      }
-    }
-
     this.fillDetected();
     this.checkRooms();
   }
@@ -325,11 +318,10 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
       return;
     }
 
-    const previous = this.filledEntity
-      ? this.detectedDefaults(this.filledEntity)
-      : undefined;
+    const previous = this.filledDefaults;
     this.filledEntity = entity;
     const detected = this.detectedDefaults(entity);
+    this.filledDefaults = detected;
 
     const config: EditorConfig = { ...this.config };
     let changed = false;
