@@ -710,6 +710,18 @@ export class VacuumCard extends LitElement {
     `;
   }
 
+  private roomsHint(): string | undefined {
+    const count = this.config.rooms.filter(
+      ({ area }) => area && this.selectedRooms.includes(area),
+    ).length;
+    if (!count) {
+      return localize('common.clean_all');
+    }
+    return count === 1
+      ? localize('common.clean_room')
+      : localize('common.clean_rooms', '{count}', String(count));
+  }
+
   private toggleRoom(area: string): void {
     this.selectedRooms = this.selectedRooms.includes(area)
       ? this.selectedRooms.filter((item) => item !== area)
@@ -747,32 +759,42 @@ export class VacuumCard extends LitElement {
 
     const group = vacuumStateGroup(state);
     const active = ['cleaning', 'paused', 'returning'].includes(group);
+    const rooms = this.renderRooms(state);
+    const cleanLabel = rooms.length ? this.roomsHint() : undefined;
     const buttons = toolbarOrder(this.config.actions)
       .map((key) => [key, TOOLBAR_BUTTONS[key]] as const)
       .filter(([key, { states }]) =>
         isShownIn(state, this.config.actions[key]?.states, states),
       )
       .map(([key, { icon }]) => {
-        const label = localize(
-          key === 'start' && (group === 'paused' || group === 'returning')
-            ? 'common.continue'
-            : `common.${key}`,
-        );
+        const resume =
+          key === 'start' && (group === 'paused' || group === 'returning');
+        const label =
+          key === 'start' && !resume && cleanLabel
+            ? cleanLabel
+            : localize(resume ? 'common.continue' : `common.${key}`);
         const onClick = this.handleVacuumAction(key, {
           request: key !== 'locate',
         });
-        return active
-          ? html`
-              <button class="toolbar-button" @click="${onClick}">
-                <ha-icon icon="${icon}"></ha-icon>
-                ${label}
-              </button>
-            `
-          : html`
-              <ha-icon-button label="${label}" @click="${onClick}">
-                <ha-icon icon="${icon}"></ha-icon>
-              </ha-icon-button>
-            `;
+        if (active) {
+          return html`
+            <button class="toolbar-button" @click="${onClick}">
+              <ha-icon icon="${icon}"></ha-icon>
+              ${label}
+            </button>
+          `;
+        }
+        const button = html`
+          <ha-icon-button label="${label}" @click="${onClick}">
+            <ha-icon icon="${icon}"></ha-icon>
+          </ha-icon-button>
+        `;
+        return key === 'start' && cleanLabel
+          ? html`<div class="clean-button">
+              ${button}
+              <span class="clean-hint">${cleanLabel}</span>
+            </div>`
+          : button;
       });
 
     const shortcuts = this.config.shortcuts
@@ -790,11 +812,11 @@ export class VacuumCard extends LitElement {
         `;
       });
 
-    const rooms = this.renderRooms(state);
-
     return html`
       ${buttons.length ? html`<div class="toolbar">${buttons}</div>` : nothing}
-      ${rooms.length ? html`<div class="toolbar rooms">${rooms}</div>` : nothing}
+      ${
+        rooms.length ? html`<div class="toolbar rooms">${rooms}</div>` : nothing
+      }
       ${
         shortcuts.length
           ? html`<div class="toolbar shortcuts">${shortcuts}</div>`

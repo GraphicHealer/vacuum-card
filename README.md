@@ -204,7 +204,7 @@ Set `valetudo: false` to use the generic detection described under [Usage](#usag
 
 The card shows three rows below the vacuum: the toolbar controls, then room toggles (`rooms`), then regular shortcuts (`shortcuts`).
 
-Room buttons are toggles and don't start cleaning by themselves. Select one or more rooms, then press **Clean**: the card calls `vacuum.clean_area` with the selected areas (in the order of the `rooms` list) and turns all toggles off again. With no rooms selected, **Clean** does its normal action. Rooms are shown whenever the Clean button is, unless you set their own `states`.
+Room buttons are toggles and don't start cleaning by themselves. Select one or more rooms, then press **Clean**: the card calls `vacuum.clean_area` with the selected areas (in the order of the `rooms` list) and turns all toggles off again. With no rooms selected, **Clean** does its normal action. A caption under **Clean** reads _Clean all_ or _Clean 2 rooms_ so you can see which will happen. Rooms are shown whenever the Clean button is, unless you set their own `states`.
 
 | Name     |   Type   | Default      | Description                                                             |
 | -------- | :------: | ------------ | ----------------------------------------------------------------------- |
