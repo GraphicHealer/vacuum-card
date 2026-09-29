@@ -317,6 +317,29 @@ ha-icon {
   }
 }
 
+.toolbar .clean-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.toolbar .clean-hint {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--vc-toolbar-text-color);
+  white-space: nowrap;
+}
+
+.toolbar ha-icon-button.room.selected {
+  color: var(--primary-color);
+  background: rgba(var(--rgb-primary-color), 0.2);
+  border-radius: 50%;
+
+  & ha-icon {
+    color: var(--primary-color);
+  }
+}
+
 .toolbar ha-icon {
   color: var(--vc-toolbar-icon-color);
   display: flex;

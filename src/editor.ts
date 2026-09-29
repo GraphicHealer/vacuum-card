@@ -6,7 +6,7 @@ import {
   fireEvent,
 } from 'custom-card-helpers';
 import localize from './localize';
-import { customElement, property, query, state } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import isEqual from 'lodash/isEqual';
 import { HassServiceTarget } from 'home-assistant-js-websocket';
 import {
@@ -15,6 +15,7 @@ import {
   Template,
   VacuumCardAction,
   VacuumCardConfig,
+  VacuumCardRoom,
   VacuumCardSelect,
   VacuumCardShortcut,
   VacuumCardStat,
@@ -246,18 +247,11 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
 
   @state() private config?: EditorConfig;
   @state() private addingTo?: string;
-  @state() private roomsMessage?: {
-    type: 'error' | 'info' | 'success';
-    text: string;
-  };
+  @state() private unmappedRooms: string[] = [];
 
-  @state() private mappingPrompt?: {
-    kind: 'explain' | 'retry';
-    entity: string;
-    rooms: string[];
-  };
+  private roomsChecked?: string;
 
-  @query('dialog.mapping-prompt') private mappingDialog?: HTMLDialogElement;
+  private autoRooms?: VacuumCardRoom[];
 
   private mappingDialogListener?: (event: Event) => void;
 
@@ -291,12 +285,6 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
   }
 
   protected updated(): void {
-    if (this.mappingPrompt && !this.mappingDialog?.open) {
-      this.mappingDialog?.showModal();
-    } else if (!this.mappingPrompt && this.mappingDialog?.open) {
-      this.mappingDialog.close();
-    }
-
     if (this.hass && this.config && !this.config.entity) {
       const entity = Object.keys(this.hass.states).find((id) =>
         id.startsWith('vacuum.'),
@@ -307,6 +295,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     }
 
     this.fillDetected();
+    this.checkRooms();
   }
 
   private detectedDefaults(
@@ -415,15 +404,10 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
       const { dialog } = (event as CustomEvent<{ dialog?: string }>).detail;
       if (dialog === 'ha-more-info-dialog') {
         this.stopWaitingForMapping();
-        this.generateRoomShortcuts(true);
+        this.syncRooms(entityId, true);
       }
     };
     window.addEventListener('dialog-closed', this.mappingDialogListener);
-
-    this.roomsMessage = {
-      type: 'info',
-      text: localize('editor.map_rooms_prompt') ?? '',
-    };
     this.dispatchEvent(
       new CustomEvent('hass-more-info', {
         detail: { entityId, view: 'settings' },
@@ -433,143 +417,98 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
     );
   }
 
-  private continueMapping(): void {
-    const prompt = this.mappingPrompt;
-    this.mappingPrompt = undefined;
-    if (prompt) {
-      this.openAreaMapping(prompt.entity);
-    }
-  }
-
-  private cancelMapping(event?: Event): void {
-    event?.preventDefault();
-    const prompt = this.mappingPrompt;
-    this.mappingPrompt = undefined;
-    if (prompt) {
-      this.roomsMessage = {
-        type: 'error',
-        text:
-          localize(
-            'error.rooms_not_mapped',
-            '{rooms}',
-            prompt.rooms.join(', '),
-          ) ?? '',
-      };
-    }
-  }
-
-  private async generateRoomShortcuts(afterMapping: boolean): Promise<void> {
+  private checkRooms(): void {
     const entity = this.config?.entity;
-    if (!this.hass || !this.config || !entity || !this.supportsCleanArea) {
+    if (!this.hass || !entity || this.roomsChecked === entity) {
       return;
     }
+    this.roomsChecked = entity;
+    this.unmappedRooms = [];
+    if (this.supportsCleanArea) {
+      this.syncRooms(entity, false);
+    }
+  }
 
+  private async syncRooms(entity: string, addMissing: boolean): Promise<void> {
     const [segments, mapping] = await Promise.all([
       this.getSegments(entity),
       this.getAreaMapping(entity),
     ]);
-    if (!segments.length) {
-      this.roomsMessage = {
-        type: 'error',
-        text: localize('error.no_rooms') ?? '',
-      };
+    if (!this.config || this.config.entity !== entity) {
       return;
     }
 
     const mapped = new Set(Object.values(mapping).flat().map(String));
-    const unmapped = segments.filter(({ id }) => !mapped.has(String(id)));
-    if (unmapped.length) {
-      this.roomsMessage = undefined;
-      this.mappingPrompt = {
-        kind: afterMapping ? 'retry' : 'explain',
-        entity,
-        rooms: unmapped.map(({ name }) => name),
-      };
-      return;
-    }
+    this.unmappedRooms = segments
+      .filter(({ id }) => !mapped.has(String(id)))
+      .map(({ name }) => name);
 
+    const configured =
+      this.config.rooms === undefined ||
+      isEqual(this.config.rooms, this.autoRooms)
+        ? undefined
+        : this.config.rooms;
+    const rooms = configured ?? [];
+    const listed = new Set(rooms.map(({ area }) => area));
     const shortcuts = this.config.shortcuts ?? [];
-    const existing = new Set(shortcuts.map(roomArea));
-    const roomShortcuts: VacuumCardShortcut[] = Object.entries(mapping)
-      .filter(([areaId, ids]) => ids.length && !existing.has(areaId))
-      .map(([areaId]) => {
+    const moved = new Map(
+      shortcuts.flatMap((shortcut) => {
+        const area = roomArea(shortcut);
+        return area && area in mapping ? [[area, shortcut] as const] : [];
+      }),
+    );
+    const areas =
+      configured && !addMissing
+        ? [...moved.keys()]
+        : Object.keys(mapping).filter((area) => mapping[area].length);
+    const added: VacuumCardRoom[] = areas
+      .filter((area) => !listed.has(area))
+      .map((areaId) => {
         const area = this.hass?.areas?.[areaId];
-        const name = area?.name ?? areaId;
         return {
-          name: localize('editor.clean_room', '{room}', name) ?? name,
-          icon: area?.icon || 'mdi:texture-box',
-          action: 'vacuum.clean_area',
-          target: { entity_id: entity },
-          data: { cleaning_area_id: [areaId] },
+          area: areaId,
+          name: area?.name ?? areaId,
+          icon: moved.get(areaId)?.icon || area?.icon || 'mdi:texture-box',
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    this.mappingPrompt = undefined;
-    if (!roomShortcuts.length) {
-      this.roomsMessage = {
-        type: 'info',
-        text: localize('editor.room_shortcuts_none') ?? '',
-      };
+    const next = [...rooms, ...added];
+    if (!configured) {
+      this.autoRooms = next;
+    }
+    if (!moved.size && isEqual(next, this.config.rooms)) {
       return;
     }
-
     this.updateConfig({
       ...this.config,
-      shortcuts: [...shortcuts, ...roomShortcuts],
+      rooms: next,
+      shortcuts: shortcuts.filter(
+        (shortcut) => !moved.has(roomArea(shortcut) ?? ''),
+      ),
     });
-    this.roomsMessage = {
-      type: 'success',
-      text:
-        localize(
-          'editor.room_shortcuts_added',
-          '{count}',
-          String(roomShortcuts.length),
-        ) ?? '',
-    };
   }
 
-  private renderMappingPrompt(): Template {
-    const prompt = this.mappingPrompt;
-    const retry = prompt?.kind === 'retry';
+  private renderMappingAlert(): Template {
+    const entity = this.config?.entity;
+    if (!entity || !this.unmappedRooms.length) {
+      return nothing;
+    }
 
     return html`
-      <dialog class="mapping-prompt" @cancel=${this.cancelMapping}>
-        ${
-          prompt
-            ? html`
-                <h2>
-                  ${localize(
-                    retry
-                      ? 'editor.map_rooms_retry_title'
-                      : 'editor.map_rooms_title',
-                  )}
-                </h2>
-                <p>
-                  ${localize(
-                    retry
-                      ? 'editor.map_rooms_retry'
-                      : 'editor.map_rooms_explain',
-                  )}
-                </p>
-                <ul>
-                  ${prompt.rooms.map((room) => html`<li>${room}</li>`)}
-                </ul>
-                <div class="actions">
-                  <ha-button
-                    appearance="plain"
-                    @click=${() => this.cancelMapping()}
-                  >
-                    ${localize('editor.cancel')}
-                  </ha-button>
-                  <ha-button @click=${this.continueMapping}>
-                    ${localize(retry ? 'editor.try_again' : 'editor.continue')}
-                  </ha-button>
-                </div>
-              `
-            : nothing
-        }
-      </dialog>
+      <ha-alert
+        class="mapping-alert"
+        alert-type="error"
+        .title=${localize('editor.map_rooms_title') ?? ''}
+      >
+        ${localize('editor.map_rooms_explain')}
+        <ul>
+          ${this.unmappedRooms.map((room) => html`<li>${room}</li>`)}
+        </ul>
+        <ha-button slot="action" @click=${() => this.openAreaMapping(entity)}>
+          ${localize('editor.map_rooms_open')}
+        </ha-button>
+      </ha-alert>
     `;
   }
 
@@ -752,32 +691,70 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
             <ha-icon slot="start" icon="mdi:plus"></ha-icon>
             ${localize('editor.shortcut_add')}
           </ha-button>
-          ${this.renderRoomShortcuts()}
         </div>
       </ha-expansion-panel>
     `;
   }
 
-  private renderRoomShortcuts(): Template {
-    if (!this.supportsCleanArea) {
+  private setRooms(rooms: VacuumCardRoom[]): void {
+    this.updateConfig({ ...this.config!, rooms });
+  }
+
+  private roomSchema({ area }: VacuumCardRoom): ItemSchema[] {
+    const entry = area ? this.hass?.areas?.[area] : undefined;
+    return [
+      { name: 'area', required: true, selector: { area: {} } },
+      { name: 'name', selector: { text: { placeholder: entry?.name } } },
+      {
+        name: 'icon',
+        selector: { icon: { placeholder: entry?.icon ?? 'mdi:texture-box' } },
+      },
+      this.statesSchema(localize('editor.states_room')),
+    ];
+  }
+
+  private renderRooms(): Template {
+    const items = this.config?.rooms ?? [];
+    if (!this.supportsCleanArea && !items.length) {
       return nothing;
     }
 
     return html`
-      <div class="room-shortcuts">
-        <ha-button @click=${() => this.generateRoomShortcuts(false)}>
-          ${localize('editor.room_shortcuts')}
-        </ha-button>
-        <span class="help"> ${localize('editor.room_shortcuts_help')} </span>
-        ${
-          this.roomsMessage
-            ? html`<ha-alert alert-type=${this.roomsMessage.type}>
-                ${this.roomsMessage.text}
-              </ha-alert>`
-            : nothing
-        }
-        ${this.renderMappingPrompt()}
-      </div>
+      <ha-expansion-panel
+        outlined
+        .header=${localize('editor.rooms')}
+        .secondary=${localize('editor.rooms_help')}
+      >
+        <div class="items">
+          ${this.renderSortable(
+            items.map((item, index) =>
+              this.renderItem(
+                item.name ||
+                  (item.area && this.hass?.areas?.[item.area]?.name) ||
+                  item.area,
+                item.area,
+                this.roomSchema(item),
+                { ...item },
+                (value) =>
+                  this.setRooms(
+                    items.map((old, i) =>
+                      i === index ? (value as unknown as VacuumCardRoom) : old,
+                    ),
+                  ),
+                () => this.setRooms(items.filter((_, i) => i !== index)),
+              ),
+            ),
+            (from, to) => this.setRooms(moveItem(items, from, to)),
+          )}
+          <ha-button
+            appearance="plain"
+            @click=${() => this.setRooms([...items, { area: '' }])}
+          >
+            <ha-icon slot="start" icon="mdi:plus"></ha-icon>
+            ${localize('editor.room_add')}
+          </ha-button>
+        </div>
+      </ha-expansion-panel>
     `;
   }
 
@@ -1065,6 +1042,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
 
     return html`
       <div class="card-config">
+        ${this.renderMappingAlert()}
         <ha-form
           .hass=${this.hass}
           .data=${{
@@ -1075,8 +1053,9 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
           .computeLabel=${this.computeLabel}
           @value-changed=${this.valueChanged}
         ></ha-form>
-        ${this.renderSelects()} ${this.renderStats()} ${this.renderShortcuts()}
-        ${this.renderToolbarActions()}
+        ${this.renderSelects()} ${this.renderStats()}
+        ${this.renderToolbarActions()} ${this.renderRooms()}
+        ${this.renderShortcuts()}
       </div>
     `;
   }

@@ -17,6 +17,7 @@ import buildConfig, {
   TOOLBAR_BUTTONS,
   toolbarOrder,
   isShownIn,
+  roomStates,
   vacuumStateGroup,
 } from './config';
 import {
@@ -67,6 +68,7 @@ export class VacuumCard extends LitElement {
 
   @state() private config!: VacuumCardConfig;
   @state() private requestInProgress = false;
+  @state() private selectedRooms: string[] = [];
 
   private thumbUpdater: ReturnType<typeof setInterval> | null = null;
   private detectedCache: {
@@ -470,6 +472,20 @@ export class VacuumCard extends LitElement {
     params: VacuumActionParams = { request: true },
   ) {
     return () => {
+      const areas = this.config.rooms
+        .map(({ area }) => area)
+        .filter((area) => area && this.selectedRooms.includes(area));
+      if (action === 'start' && areas.length) {
+        this.callService({
+          action: 'vacuum.clean_area',
+          target: { entity_id: this.config.entity },
+          data: { cleaning_area_id: areas },
+        });
+        this.selectedRooms = [];
+        this.requestInProgress = true;
+        return;
+      }
+
       const override = this.config.actions[action];
       if (!override?.action) {
         return this.callVacuumService(params.defaultService || action, params);
@@ -694,6 +710,48 @@ export class VacuumCard extends LitElement {
     `;
   }
 
+  private roomsHint(): string | undefined {
+    const count = this.config.rooms.filter(
+      ({ area }) => area && this.selectedRooms.includes(area),
+    ).length;
+    if (!count) {
+      return localize('common.clean_all');
+    }
+    return count === 1
+      ? localize('common.clean_room')
+      : localize('common.clean_rooms', '{count}', String(count));
+  }
+
+  private toggleRoom(area: string): void {
+    this.selectedRooms = this.selectedRooms.includes(area)
+      ? this.selectedRooms.filter((item) => item !== area)
+      : [...this.selectedRooms, area];
+  }
+
+  private renderRooms(state: VacuumEntityState): Template[] {
+    const fallback = roomStates(this.config);
+    return this.config.rooms
+      .filter(({ area, states }) => area && isShownIn(state, states, fallback))
+      .map(({ area, name, icon }) => {
+        const entry = this.hass.areas?.[area];
+        const label = name || entry?.name || area;
+        const selected = this.selectedRooms.includes(area);
+        return html`
+          <ha-icon-button
+            class="room ${selected ? 'selected' : ''}"
+            label="${label}"
+            title="${label}"
+            aria-pressed="${selected ? 'true' : 'false'}"
+            @click="${() => this.toggleRoom(area)}"
+          >
+            <ha-icon
+              icon="${icon || entry?.icon || 'mdi:texture-box'}"
+            ></ha-icon>
+          </ha-icon-button>
+        `;
+      });
+  }
+
   private renderToolbar(state: VacuumEntityState): Template {
     if (!this.config.show_toolbar) {
       return nothing;
@@ -701,32 +759,42 @@ export class VacuumCard extends LitElement {
 
     const group = vacuumStateGroup(state);
     const active = ['cleaning', 'paused', 'returning'].includes(group);
+    const rooms = this.renderRooms(state);
+    const cleanLabel = rooms.length ? this.roomsHint() : undefined;
     const buttons = toolbarOrder(this.config.actions)
       .map((key) => [key, TOOLBAR_BUTTONS[key]] as const)
       .filter(([key, { states }]) =>
         isShownIn(state, this.config.actions[key]?.states, states),
       )
       .map(([key, { icon }]) => {
-        const label = localize(
-          key === 'start' && (group === 'paused' || group === 'returning')
-            ? 'common.continue'
-            : `common.${key}`,
-        );
+        const resume =
+          key === 'start' && (group === 'paused' || group === 'returning');
+        const label =
+          key === 'start' && !resume && cleanLabel
+            ? cleanLabel
+            : localize(resume ? 'common.continue' : `common.${key}`);
         const onClick = this.handleVacuumAction(key, {
           request: key !== 'locate',
         });
-        return active
-          ? html`
-              <button class="toolbar-button" @click="${onClick}">
-                <ha-icon icon="${icon}"></ha-icon>
-                ${label}
-              </button>
-            `
-          : html`
-              <ha-icon-button label="${label}" @click="${onClick}">
-                <ha-icon icon="${icon}"></ha-icon>
-              </ha-icon-button>
-            `;
+        if (active) {
+          return html`
+            <button class="toolbar-button" @click="${onClick}">
+              <ha-icon icon="${icon}"></ha-icon>
+              ${label}
+            </button>
+          `;
+        }
+        const button = html`
+          <ha-icon-button label="${label}" @click="${onClick}">
+            <ha-icon icon="${icon}"></ha-icon>
+          </ha-icon-button>
+        `;
+        return key === 'start' && cleanLabel
+          ? html`<div class="clean-button">
+              ${button}
+              <span class="clean-hint">${cleanLabel}</span>
+            </div>`
+          : button;
       });
 
     const shortcuts = this.config.shortcuts
@@ -744,20 +812,16 @@ export class VacuumCard extends LitElement {
         `;
       });
 
-    if (!buttons.length && !shortcuts.length) {
-      return nothing;
-    }
-
     return html`
-      <div class="toolbar">
-        ${buttons}
-        ${
-          shortcuts.length
-            ? html`<div class="fill-gap"></div>
-                ${shortcuts}`
-            : nothing
-        }
-      </div>
+      ${buttons.length ? html`<div class="toolbar">${buttons}</div>` : nothing}
+      ${
+        rooms.length ? html`<div class="toolbar rooms">${rooms}</div>` : nothing
+      }
+      ${
+        shortcuts.length
+          ? html`<div class="toolbar shortcuts">${shortcuts}</div>`
+          : nothing
+      }
     `;
   }
 
