@@ -15,6 +15,7 @@ import {
   Template,
   VacuumCardAction,
   VacuumCardConfig,
+  VacuumCardRoom,
   VacuumCardSelect,
   VacuumCardShortcut,
   VacuumCardStat,
@@ -488,25 +489,30 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
       return;
     }
 
+    const rooms = this.config.rooms ?? [];
+    const existing = new Set(rooms.map(({ area }) => area));
     const shortcuts = this.config.shortcuts ?? [];
-    const existing = new Set(shortcuts.map(roomArea));
-    const roomShortcuts: VacuumCardShortcut[] = Object.entries(mapping)
+    const oldShortcuts = new Map(
+      shortcuts.flatMap((shortcut) => {
+        const area = roomArea(shortcut);
+        return area && area in mapping ? [[area, shortcut] as const] : [];
+      }),
+    );
+    const newRooms: VacuumCardRoom[] = Object.entries(mapping)
       .filter(([areaId, ids]) => ids.length && !existing.has(areaId))
       .map(([areaId]) => {
         const area = this.hass?.areas?.[areaId];
-        const name = area?.name ?? areaId;
         return {
-          name: localize('editor.clean_room', '{room}', name) ?? name,
-          icon: area?.icon || 'mdi:texture-box',
-          action: 'vacuum.clean_area',
-          target: { entity_id: entity },
-          data: { cleaning_area_id: [areaId] },
+          area: areaId,
+          name: area?.name ?? areaId,
+          icon:
+            oldShortcuts.get(areaId)?.icon || area?.icon || 'mdi:texture-box',
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
 
     this.mappingPrompt = undefined;
-    if (!roomShortcuts.length) {
+    if (!newRooms.length && !oldShortcuts.size) {
       this.roomsMessage = {
         type: 'info',
         text: localize('editor.room_shortcuts_none') ?? '',
@@ -516,7 +522,10 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
 
     this.updateConfig({
       ...this.config,
-      shortcuts: [...shortcuts, ...roomShortcuts],
+      rooms: [...rooms, ...newRooms],
+      shortcuts: shortcuts.filter(
+        (shortcut) => !oldShortcuts.has(roomArea(shortcut) ?? ''),
+      ),
     });
     this.roomsMessage = {
       type: 'success',
@@ -524,7 +533,7 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
         localize(
           'editor.room_shortcuts_added',
           '{count}',
-          String(roomShortcuts.length),
+          String(newRooms.length),
         ) ?? '',
     };
   }
@@ -752,13 +761,75 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
             <ha-icon slot="start" icon="mdi:plus"></ha-icon>
             ${localize('editor.shortcut_add')}
           </ha-button>
-          ${this.renderRoomShortcuts()}
         </div>
       </ha-expansion-panel>
     `;
   }
 
-  private renderRoomShortcuts(): Template {
+  private setRooms(rooms: VacuumCardRoom[]): void {
+    this.updateConfig({ ...this.config!, rooms });
+  }
+
+  private roomSchema({ area }: VacuumCardRoom): ItemSchema[] {
+    const entry = area ? this.hass?.areas?.[area] : undefined;
+    return [
+      { name: 'area', required: true, selector: { area: {} } },
+      { name: 'name', selector: { text: { placeholder: entry?.name } } },
+      {
+        name: 'icon',
+        selector: { icon: { placeholder: entry?.icon ?? 'mdi:texture-box' } },
+      },
+      this.statesSchema(localize('editor.states_room')),
+    ];
+  }
+
+  private renderRooms(): Template {
+    const items = this.config?.rooms ?? [];
+    if (!this.supportsCleanArea && !items.length) {
+      return nothing;
+    }
+
+    return html`
+      <ha-expansion-panel
+        outlined
+        .header=${localize('editor.rooms')}
+        .secondary=${localize('editor.rooms_help')}
+      >
+        <div class="items">
+          ${this.renderSortable(
+            items.map((item, index) =>
+              this.renderItem(
+                item.name ||
+                  (item.area && this.hass?.areas?.[item.area]?.name) ||
+                  item.area,
+                item.area,
+                this.roomSchema(item),
+                { ...item },
+                (value) =>
+                  this.setRooms(
+                    items.map((old, i) =>
+                      i === index ? (value as unknown as VacuumCardRoom) : old,
+                    ),
+                  ),
+                () => this.setRooms(items.filter((_, i) => i !== index)),
+              ),
+            ),
+            (from, to) => this.setRooms(moveItem(items, from, to)),
+          )}
+          <ha-button
+            appearance="plain"
+            @click=${() => this.setRooms([...items, { area: '' }])}
+          >
+            <ha-icon slot="start" icon="mdi:plus"></ha-icon>
+            ${localize('editor.room_add')}
+          </ha-button>
+          ${this.renderRoomGenerator()}
+        </div>
+      </ha-expansion-panel>
+    `;
+  }
+
+  private renderRoomGenerator(): Template {
     if (!this.supportsCleanArea) {
       return nothing;
     }
@@ -1075,8 +1146,9 @@ export class VacuumCardEditor extends LitElement implements LovelaceCardEditor {
           .computeLabel=${this.computeLabel}
           @value-changed=${this.valueChanged}
         ></ha-form>
-        ${this.renderSelects()} ${this.renderStats()} ${this.renderShortcuts()}
-        ${this.renderToolbarActions()}
+        ${this.renderSelects()} ${this.renderStats()}
+        ${this.renderToolbarActions()} ${this.renderRooms()}
+        ${this.renderShortcuts()}
       </div>
     `;
   }

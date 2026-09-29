@@ -67,6 +67,13 @@ export interface VacuumCardToolbarAction extends Partial<VacuumCardAction> {
   states?: string[];
 }
 
+export interface VacuumCardRoom {
+  area: string;
+  name?: string;
+  icon?: string;
+  states?: string[];
+}
+
 export interface VacuumCardShortcut {
   name?: string;
   icon?: string;
@@ -90,6 +97,7 @@ export interface VacuumCardConfig {
   compact_view: boolean;
   stats?: VacuumCardStat[];
   actions: Record<string, VacuumCardToolbarAction>;
+  rooms: VacuumCardRoom[];
   shortcuts: VacuumCardShortcut[];
 }
 

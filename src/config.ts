@@ -37,6 +37,12 @@ export function toolbarOrder(actions?: Record<string, unknown>): string[] {
   return [...configured, ...keys.filter((key) => !configured.includes(key))];
 }
 
+export function roomStates(
+  config: Pick<VacuumCardConfig, 'actions'>,
+): string[] {
+  return config.actions?.start?.states ?? TOOLBAR_BUTTONS.start.states;
+}
+
 export const SHORTCUT_STATES = ['docked', 'idle', 'error'];
 
 export function vacuumStateGroup(state: string): string {
@@ -109,6 +115,7 @@ export default function buildConfig(
       config.stats as VacuumCardStat[] | LegacyStats | undefined,
     ),
     actions: config.actions ?? {},
+    rooms: config.rooms ?? [],
     shortcuts: config.shortcuts ?? [],
   };
 }
