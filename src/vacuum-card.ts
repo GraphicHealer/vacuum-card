@@ -85,12 +85,8 @@ export class VacuumCard extends LitElement {
     return document.createElement('vacuum-card-editor');
   }
 
-  static getStubConfig(_: unknown, entities: string[]) {
-    const [vacuumEntity] = entities.filter((eid) => eid.startsWith('vacuum'));
-
-    return {
-      entity: vacuumEntity ?? '',
-    };
+  static getStubConfig() {
+    return { entity: '' };
   }
 
   get entity(): VacuumEntity {
