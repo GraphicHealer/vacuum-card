@@ -223,9 +223,9 @@ rooms:
     icon: mdi:stove
 ```
 
-For any vacuum that supports Home Assistant's area cleaning (`vacuum.clean_area`), including Valetudo, the visual editor's **Rooms** section has a **Generate Rooms** button. It adds every Home Assistant area the vacuum's segments are mapped to that isn't in the list yet, named and iconed after that area. Existing `vacuum.clean_area` shortcuts for a single area are moved from `shortcuts` into `rooms`, keeping their icon.
+For any vacuum that supports Home Assistant's area cleaning (`vacuum.clean_area`), including Valetudo, the visual editor fills `rooms` automatically with every Home Assistant area the vacuum's segments are mapped to, named and iconed after that area, like it does for other detected entities. Existing `vacuum.clean_area` shortcuts for a single area are moved from `shortcuts` into `rooms`, keeping their icon. To detect the rooms again, delete `rooms` from the YAML and reopen the editor.
 
-If any segment isn't mapped to an area yet, a pop-up lists them and explains how to map them. **Continue** opens the vacuum's settings, where you pick **Map vacuum segments to areas** and save. When you close the settings, the editor checks the mapping again: if everything is mapped the rooms are generated, otherwise a _"The locations are not mapped. Please try again."_ pop-up offers **Try Again** (reopens the settings) or **Cancel**.
+If any segment isn't mapped to an area, a **Please map rooms** error at the top of the editor lists them with instructions. **Open vacuum settings** opens the vacuum's settings, where you pick **Map vacuum segments to areas** and save. When you close the settings, the editor checks the mapping again, adds any newly mapped areas to `rooms` and hides the error once every segment is mapped.
 
 ### `stats` array
 

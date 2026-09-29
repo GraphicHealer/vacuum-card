@@ -57,9 +57,7 @@
   },
   "error": {
     "invalid_config": "Invalid configuration",
-    "missing_entity": "Specifying entity is required!",
-    "rooms_not_mapped": "These rooms are not mapped to Home Assistant areas: {rooms}. Map the vacuum's segments to areas in its settings, then try again.",
-    "no_rooms": "This vacuum didn't report any rooms."
+    "missing_entity": "Specifying entity is required!"
   },
   "warning": {
     "actions_array": "WARNING: 'actions' is reserved to override default actions for existing buttons. If your intention was to add additional actions, use the 'shortcuts' option instead."
@@ -76,17 +74,9 @@
     "code_only_note": "Note: Overriding what the toolbar buttons do (actions) is only available in the Code Editor.",
     "selects": "Header Dropdowns",
     "map_refresh": "Map Refresh Interval (Seconds)",
-    "room_shortcuts": "Generate Rooms",
-    "room_shortcuts_help": "Adds each mapped area that isn't in the list yet, and moves existing vacuum.clean_area shortcuts here.",
-    "room_shortcuts_added": "Added {count} rooms.",
-    "map_rooms_prompt": "Waiting for the vacuum settings window to close…",
-    "map_rooms_title": "Map rooms to areas",
-    "map_rooms_explain": "These rooms are not mapped to Home Assistant areas yet. In the next window, choose \"Map vacuum segments to areas\", pick an area for each room, save, then close the window.",
-    "map_rooms_retry_title": "Rooms not mapped",
-    "map_rooms_retry": "The locations are not mapped. Please try again.",
-    "try_again": "Try Again",
+    "map_rooms_title": "Please map rooms",
+    "map_rooms_explain": "These rooms of the vacuum aren't mapped to Home Assistant areas, so they can't be cleaned from this card. Open the vacuum settings, choose \"Map vacuum segments to areas\", pick an area for each room, save and close the window. Mapped areas are added to Rooms automatically.",
     "cancel": "Cancel",
-    "continue": "Continue",
     "stats": "Sensors",
     "remove": "Remove",
     "item_add": "Add entity",
@@ -99,7 +89,6 @@
     "item_unit": "Unit",
     "item_value_template": "Value template",
     "item_name": "Name",
-    "room_shortcuts_none": "Every mapped area is already in the list.",
     "shortcuts": "Shortcuts",
     "shortcut_add": "Add shortcut",
     "new_shortcut": "New shortcut",
@@ -118,10 +107,11 @@
     "item_count": "{count} items",
     "fan_speed": "Fan speed",
     "rooms": "Rooms",
-    "rooms_help": "Toggle rooms on the card, then press Clean to clean only those rooms.",
+    "rooms_help": "Filled from the areas the vacuum's segments are mapped to. Toggle rooms on the card, then press Clean to clean only those rooms.",
     "room_add": "Add room",
     "item_area": "Area",
-    "states_room": "Shown with the Clean button if none are checked."
+    "states_room": "Shown with the Clean button if none are checked.",
+    "map_rooms_open": "Open vacuum settings"
   },
   "mode": {
     "vacuum": "Vacuum",
